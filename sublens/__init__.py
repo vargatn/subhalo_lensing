@@ -16,4 +16,6 @@ Contents:
 
 * visual package to create some simple diagnostic plots
 
+* also many more cool features!!!
+
 """

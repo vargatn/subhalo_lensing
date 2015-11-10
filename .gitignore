@@ -1,4 +1,7 @@
 settings.yaml
+build
+dist
+sublens.egg-info
 .idea
 */__pycache__
 __pycache__
