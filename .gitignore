@@ -1,4 +1,6 @@
+settings.yaml
 .idea
+*/__pycache__
 __pycache__
 */*.pdf
 */*.npz
