@@ -23,5 +23,7 @@ Functionality:
 
                         - The profile is saved along with a logfile
                           describing the dataset
-                        
+
 """
+
+from .ioshear import *

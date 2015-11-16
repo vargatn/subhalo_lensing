@@ -17,15 +17,3 @@ Contents:
 import math
 
 
-def converter(m200, c200, z):
-
-
-    cdens = cosmo.crit_dens(z) * (nc.Mpc ** 3. / nc.M_sun)
-    r200 = (3. / 4. * m200 / (200. * cdens) / math.pi) ** (1. / 3.)
-    rs = r200 / c200
-    dc = 200. / 3. * (c200 ** 3.) / (math.log(1. + c200 - c200 / (1. + c200)))
-    rho_s = dc * cdens
-
-    return rs, rho_s, r200
-
-
