@@ -20,3 +20,5 @@ Contents:
 * also many more cool features!!!
 
 """
+
+from .model import *
