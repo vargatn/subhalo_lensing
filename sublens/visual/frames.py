@@ -2,6 +2,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
+
 def add_prof(axt, axx, dtup, **kwargs):
     rr, dst, dsx = dtup[:3]
     axt.plot(rr, dst, **kwargs)
