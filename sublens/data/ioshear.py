@@ -7,21 +7,23 @@ import numpy as np
 from astropy.io import fits
 import pickle
 import pandas as pd
+import kmeans_radec as krd
 
 
 class ShearIO:
 
-    def __init__(self, info, data, catalog, nbin=15, rmin=0.02, rmax=30.,
+    def __init__(self, info, data, cat, ra, dec, nbin=15, rmin=0.02, rmax=30.,
                  doc=""):
         self.info = info
         self.data = data
-        self.catalog = catalog
+        self.cat = cat
+        self.ra = ra
+        self.dec = dec
         self.nbin = 15
         self.rmin = 0.02
         self.rmax = rmax
         self.doc = doc
-        self.edges = self.redges(nbin, rmin, rmax)
-        print(self.edges)
+        self.cens, self.edges, self.areas = self.redges(nbin, rmin, rmax)
 
     @classmethod
     def from_file(cls, fname):
@@ -30,9 +32,12 @@ class ShearIO:
 
         names, info, data = cls.xout(log['res_name'], mode='dat')
         cat = fits.open(log["lens_path"])[1].data
+        lens_file = np.loadtxt(log['lens_name'])
+        ra = lens_file[:, 1]
+        dec = lens_file[:, 2]
 
-        sio1 = cls(info, data, cat, nbin=log['nbin'], rmin=log['rmin'],
-                   rmax=log['rmax'], doc=log['doc'])
+        sio1 = cls(info, data, cat, ra, dec, nbin=log['nbin'],
+                   rmin=log['rmin'], rmax=log['rmax'], doc=log['doc'])
         return sio1
 
     @staticmethod
@@ -130,6 +135,97 @@ class ShearIO:
         assert (info[:, 2] == np.sum(data[0, :, :], axis=1)).all()
 
         return names, info, data
+
+    def prof_raw(self, ids=None, pw=None):
+        """calculates raw profile based on dataset"""
+
+        idata = self.data[:, ids, :]
+
+        if ids is None:
+            ids = np.arange(len(idata[0, :, 0]))
+
+        if pw is None:
+            pw = np.expand_dims(np.ones(len(idata[0, :, 0])), axis=1)
+
+        psum = np.sum(pw)
+
+        rr = np.sum(np.multiply(idata[1, :, :], pw), axis=0) /\
+             np.sum(np.multiply(idata[2, :, :], pw), axis=0)
+
+        dsum = np.sum(np.multiply(idata[3, :, :], pw), axis=0) / psum
+
+        dsensum = np.sum(np.multiply(idata[5, :, :], pw), axis=0) / psum
+
+        osum = np.sum(np.multiply(idata[4, :, :], pw), axis=0) / psum
+
+        osensum = np.sum(np.multiply(idata[6, :, :], pw), axis=0) / psum
+
+        dst = dsum / dsensum
+        dsx = osum / osensum
+
+        return rr, dst, dsx
+
+    def prof_err(self, ids=None, pw=None, ncen=100, verbose=False):
+        """shorthand wrapper"""
+        return self.jack_err(self.ra, self.dec, ids=ids, pw=pw, ncen=ncen,
+                             verbose=verbose)
+
+    def jack_err(self, ra, dec, ids=None, pw=None, ncen=100, verbose=False):
+        """calculates raw profile based on dataset"""
+
+        idata = self.data[:, ids, :]
+
+        if ids is None:
+            ids = np.arange(len(idata[0, :, 0]))
+
+        if pw is None:
+            pw = np.expand_dims(np.ones(len(idata[0, :, 0])), axis=1)
+
+        psum = np.sum(pw)
+
+        rr = np.sum(np.multiply(idata[1, :, :], pw), axis=0) /\
+             np.sum(np.multiply(idata[2, :, :], pw), axis=0)
+
+        # creating kmeans patches
+        X = np.vstack((ra[ids], dec[ids])).T
+        nsample = X.shape[0] // 2
+        km = krd.kmeans_sample(X, ncen=ncen, nsample=nsample, verbose=verbose)
+
+        if not km.converged:
+            km.run(X, maxiter=100)
+
+        labels = np.unique(km.labels)
+
+        dst_est = np.zeros((ncen, idata.shape[2]))
+        dsx_est = np.zeros((ncen, idata.shape[2]))
+
+        # calculating subprofiles
+        for i, lab in enumerate(labels):
+
+            ind = np.where(km.labels != lab)[0]
+
+            dsum_jack = np.sum(np.multiply(idata[3, ind, :],
+                                           pw[ind]), axis=0) / psum
+            dsensum_jack = np.sum(np.multiply(idata[5, ind, :],
+                                              pw[ind]), axis=0) / psum
+            osum_jack = np.sum(np.multiply(idata[4, ind, :],
+                                           pw[ind]), axis=0) / psum
+            osensum_jack = np.sum(np.multiply(idata[6, ind, :],
+                                              pw[ind]), axis=0) / psum
+
+            dst_est[i, :] = dsum_jack / dsensum_jack
+            dsx_est[i, :] = osum_jack / osensum_jack
+
+        # estimating value
+        dst = np.mean(dst_est, axis=0)
+        dsx = np.mean(dsx_est, axis=0)
+        dst_var = (ncen - 1.) / ncen * np.sum((dst_est - dst) ** 2., axis=0)
+        dsx_var = (ncen - 1.) / ncen * np.sum((dsx_est - dsx) ** 2., axis=0)
+
+        dst_e = np.sqrt(dst_var)
+        dsx_e = np.sqrt(dsx_var)
+
+        return rr, dst, dst_e, dsx, dsx_e
 
 
 class WrapX:
