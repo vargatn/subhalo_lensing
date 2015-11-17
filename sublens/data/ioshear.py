@@ -2,13 +2,137 @@
 Class to document xshear calculations
 """
 
-
+import math
 import numpy as np
 from astropy.io import fits
 import pickle
+import pandas as pd
 
 
 class ShearIO:
+
+    def __init__(self, info, data, catalog, nbin=15, rmin=0.02, rmax=30.,
+                 doc=""):
+        self.info = info
+        self.data = data
+        self.catalog = catalog
+        self.nbin = 15
+        self.rmin = 0.02
+        self.rmax = rmax
+        self.doc = doc
+        self.edges = self.redges(nbin, rmin, rmax)
+        print(self.edges)
+
+    @classmethod
+    def from_file(cls, fname):
+        """loads data file from WrapX log"""
+        log = pickle.load(open(fname, "rb"))
+
+        names, info, data = cls.xout(log['res_name'], mode='dat')
+        cat = fits.open(log["lens_path"])[1].data
+
+        sio1 = cls(info, data, cat, nbin=log['nbin'], rmin=log['rmin'],
+                   rmax=log['rmax'], doc=log['doc'])
+        return sio1
+
+    @staticmethod
+    def redges(nbin, rmin, rmax):
+        """calculates true edges and center for logarithmic bins"""
+        edges = np.logspace(math.log10(rmin), math.log10(rmax), nbin + 1,
+                            endpoint=True)
+
+        cens = np.array([(edges[i + 1] ** 3. - edges[i] ** 3.) * 2. / 3. /
+                         (edges[i + 1] ** 2. - edges[i] ** 2.)
+                         for i, edge in enumerate(edges[:-1])])
+
+        areas = np.array([np.pi * (edges[i + 1] ** 2. - edges[i] ** 2.)
+                          for i, val in enumerate(edges[:-1])])
+
+        return cens, edges, areas
+
+    @staticmethod
+    def xout(fname, mode="dat", bins="auto"):
+        """
+        loads lensfit style output cfile from xshear
+
+        This is the cfile where the output is piped, e.g.: lens_res.dat
+
+        columns:
+        ---------
+        index, weight_tot, totpairs, npair_i, rsum_i, wsum_i, dsum_i, osum_i,
+        dsensum_i, osensum_i
+
+        description:
+        -------------
+        index:      index from lens catalog
+        weight_tot: sum of all weights for all source pairs in all radial bins
+        totpairs:   total pairs used
+        npair_i:    number of pairs in radial bin i.  N columns.
+        rsum_i:     sum of radius in radial bin i
+        wsum_i:     sum of weights in radial bin i
+        dsum_i:     sum of \Delta\Sigma_+ * weights in radial bin i.
+        osum_i:     sum of \Delta\Sigma_x * weights in  radial bin i.
+        dsensum_i:  sum of weights times sensitivities
+        osensum_i:  sum of weights times sensitivities
+
+
+        :param fname: cfile name
+        :param mode: switches between ascii and npy table
+        :return: numpy array
+        """
+
+        names = {
+            "info": ("index", "weight_tot", "totpairs"),
+            "data": ("npair_i", "rsum_i", "wsum_i", "dsum_i", "osum_i",
+                     "dsensum_i", "osensum_i"),
+        }
+
+        #  reading output data
+        if mode == "npy":
+            raw_data = np.load(fname)
+        elif mode == "dat":
+            raw_data = pd.read_csv(fname, header=None, sep=" ").values
+        else:
+            raise NameError("Invalid format\n please use: npy or dat")
+
+        # calculates number of radial bins used
+        if bins == "auto":
+            bins = (raw_data.shape[1] - 3) // 7
+
+        # position indexes
+        sid = 3
+        pos_npair = 0
+        pos_rsum = 1
+        pos_wsum = 2
+        pos_dsum = 3
+        pos_osum = 4
+        pos_dsensum = 5
+        pos_osensum = 6
+
+        gid = raw_data[:, 0]
+        weight_tot = raw_data[:, 1]
+        tot_pairs = raw_data[:, 2]
+        npair = raw_data[:, sid + pos_npair * bins: sid + (pos_npair + 1) * bins]
+        rsum = raw_data[:, sid + pos_rsum * bins: sid + (pos_rsum + 1) * bins]
+        wsum = raw_data[:, sid + pos_wsum * bins: sid + (pos_wsum + 1) * bins]
+        dsum = raw_data[:, sid + pos_dsum * bins: sid + (pos_dsum + 1) * bins]
+        osum = raw_data[:, sid + pos_osum * bins: sid + (pos_osum + 1) * bins]
+        dsensum = raw_data[:,
+                  sid + pos_dsensum * bins: sid + (pos_dsensum + 1) * bins]
+        osensum = raw_data[:,
+                  sid + pos_osensum * bins: sid + (pos_osensum + 1) * bins]
+
+        info = np.vstack((gid, weight_tot, tot_pairs)).T
+        data = np.dstack((npair, rsum, wsum, dsum, osum, dsensum, osensum))
+        data = np.transpose(data, axes=(2, 0, 1))
+
+        # checking if loading made sense
+        assert (info[:, 2] == np.sum(data[0, :, :], axis=1)).all()
+
+        return names, info, data
+
+
+class WrapX:
 
     def __init__(self, name, lens_path, source_path, xshear_path, h0=100.,
                  omega_m=0.3, healpix_nside=64, nbin=15, rmin=0.02, rmax=30,
@@ -121,7 +245,6 @@ class ShearIO:
 
     def write_script(self, check=False):
         """executable xshear script"""
-        assert self.xshear_path[:2] == "./", "invalid call for xshear!"
 
         script = "#!bin/bash \n"
         if check:
@@ -132,13 +255,15 @@ class ShearIO:
         script += self.xshear_path + " " + self.config_name + " " +\
                   self.lens_name + " > " + self.res_name
 
-        # script = "#!bin/bash \n" + "cat " + self.source_path + " |" + \
-        #     self.xshear_path + " " + self.config_name + " " + self.lens_name +\
-        #          " >" + self.res_name
-
         sfile = open(self.name + ".sh", "w")
         sfile.write(script)
         sfile.close()
+
+    def prepall(self):
+        self.config()
+        self.write_lens()
+        self.write_script()
+        self.write_log()
 
 
 
