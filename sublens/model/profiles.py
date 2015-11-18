@@ -19,10 +19,8 @@ import numpy as np
 from ..model.misc import nfw_pars
 
 
-def pooler(func):
-    def pooled(params):
-        return func(**params)
-    return pooled
+def poolable_example_profile(params):
+    return example_profile(**params)
 
 
 def example_profile(m200, c200, z, lims=(0.02, 2.0), num=30):
