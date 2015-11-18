@@ -1,5 +1,7 @@
 """
 Parameter scaling relationships
+
+THESE FUNCTIONS SHOULD BE PICKLEABLE
 """
 
 import numpy as np
