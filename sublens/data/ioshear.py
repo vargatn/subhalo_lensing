@@ -23,7 +23,7 @@ class ShearIO:
         self.rmin = 0.02
         self.rmax = rmax
         self.doc = doc
-        self.cens, self.edges, self.areas = self.redges(nbin, rmin, rmax)
+        self.cens, self.edges, self.areas = self.redges(rmin, rmax, nbin)
 
     @classmethod
     def from_file(cls, fname):
@@ -41,11 +41,10 @@ class ShearIO:
         return sio1
 
     @staticmethod
-    def redges(nbin, rmin, rmax):
+    def redges(rmin, rmax, nbin):
         """calculates true edges and center for logarithmic bins"""
         edges = np.logspace(math.log10(rmin), math.log10(rmax), nbin + 1,
                             endpoint=True)
-
         cens = np.array([(edges[i + 1] ** 3. - edges[i] ** 3.) * 2. / 3. /
                          (edges[i + 1] ** 2. - edges[i] ** 2.)
                          for i, edge in enumerate(edges[:-1])])
@@ -173,14 +172,12 @@ class ShearIO:
     def jack_err(self, ra, dec, ids=None, pw=None, ncen=100, verbose=False):
         """calculates raw profile based on dataset"""
 
+        if ids is None:
+            ids = np.array(range(self.data.shape[1]))
         idata = self.data[:, ids, :]
 
-        if ids is None:
-            ids = np.arange(len(idata[0, :, 0]))
-
         if pw is None:
-            pw = np.expand_dims(np.ones(len(idata[0, :, 0])), axis=1)
-
+            pw = np.expand_dims(np.ones(shape=ids.shape), axis=1)
         psum = np.sum(pw)
 
         rr = np.sum(np.multiply(idata[1, :, :], pw), axis=0) /\
@@ -204,8 +201,7 @@ class ShearIO:
 
             ind = np.where(km.labels != lab)[0]
 
-            dsum_jack = np.sum(np.multiply(idata[3, ind, :],
-                                           pw[ind]), axis=0) / psum
+            dsum_jack = np.sum(np.multiply(idata[3, ind, :], pw[ind]), axis=0) / psum
             dsensum_jack = np.sum(np.multiply(idata[5, ind, :],
                                               pw[ind]), axis=0) / psum
             osum_jack = np.sum(np.multiply(idata[4, ind, :],
