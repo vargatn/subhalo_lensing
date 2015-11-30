@@ -10,7 +10,7 @@ import pandas as pd
 import kmeans_radec as krd
 
 
-class ShearIO_blabla:
+class ShearIO:
 
     def __init__(self, info, data, cat, ra, dec, nbin=15, rmin=0.02, rmax=30.,
                  doc=""):
@@ -138,10 +138,9 @@ class ShearIO_blabla:
     def prof_raw(self, ids=None, pw=None):
         """calculates raw profile based on dataset"""
 
-        idata = self.data[:, ids, :]
-
         if ids is None:
-            ids = np.arange(len(idata[0, :, 0]))
+            ids = np.arange(len(self.data[0, :, 0]))
+        idata = self.data[:, ids, :]
 
         if pw is None:
             pw = np.expand_dims(np.ones(len(idata[0, :, 0])), axis=1)
@@ -222,6 +221,76 @@ class ShearIO_blabla:
         dsx_e = np.sqrt(dsx_var)
 
         return rr, dst, dst_e, dsx, dsx_e
+
+    def prof_cov(self, ids=None, pw=None, ncen=100, verbose=False):
+        """shorthand wrapper"""
+        return self.jack_cov(self.ra, self.dec, ids=ids, pw=pw, ncen=ncen,
+                             verbose=verbose)
+
+    def jack_cov(self, ra, dec, ids=None, pw=None, ncen=100, verbose=False):
+        """calculates raw profile based on dataset"""
+
+        if ids is None:
+            ids = np.array(range(self.data.shape[1]))
+        idata = self.data[:, ids, :]
+
+        if pw is None:
+            pw = np.expand_dims(np.ones(shape=ids.shape), axis=1)
+        psum = np.sum(pw)
+
+        rr = np.sum(np.multiply(idata[1, :, :], pw), axis=0) /\
+             np.sum(np.multiply(idata[2, :, :], pw), axis=0)
+
+        # creating kmeans patches
+        X = np.vstack((ra[ids], dec[ids])).T
+        nsample = X.shape[0] // 2
+        km = krd.kmeans_sample(X, ncen=ncen, nsample=nsample, verbose=verbose)
+
+        if not km.converged:
+            km.run(X, maxiter=100)
+
+        labels = np.unique(km.labels)
+
+        dst_est = np.zeros((ncen, idata.shape[2]))
+        dsx_est = np.zeros((ncen, idata.shape[2]))
+
+        # calculating subprofiles
+        for i, lab in enumerate(labels):
+
+            ind = np.where(km.labels != lab)[0]
+
+            dsum_jack = np.sum(np.multiply(idata[3, ind, :], pw[ind]), axis=0) / psum
+            dsensum_jack = np.sum(np.multiply(idata[5, ind, :],
+                                              pw[ind]), axis=0) / psum
+            osum_jack = np.sum(np.multiply(idata[4, ind, :],
+                                           pw[ind]), axis=0) / psum
+            osensum_jack = np.sum(np.multiply(idata[6, ind, :],
+                                              pw[ind]), axis=0) / psum
+
+            dst_est[i, :] = dsum_jack / dsensum_jack
+            dsx_est[i, :] = osum_jack / osensum_jack
+
+        # estimating value
+        dst = np.mean(dst_est, axis=0)
+        dsx = np.mean(dsx_est, axis=0)
+
+        # dst_var = (ncen - 1.) / ncen * np.sum((dst_est - dst) ** 2., axis=0)
+        # dsx_var = (ncen - 1.) / ncen * np.sum((dsx_est - dsx) ** 2., axis=0)
+
+
+        nbin = len(rr)
+
+        dst_cov = np.array([[np.sum((dst_est[:, i] - dst[i]) *
+                                    (dst_est[:, j] - dst[j]))
+                             for j in range(nbin)] for i in range(nbin)])
+        dst_cov *= (ncen - 1.) / ncen
+
+        dsx_cov = np.array([[np.sum((dsx_est[:, i] - dsx[i]) *
+                                    (dsx_est[:, j] - dsx[j]))
+                             for j in range(nbin)] for i in range(nbin)])
+        dsx_cov *= (ncen - 1.) / ncen
+
+        return rr, dst, dst_cov, dsx, dsx_cov
 
 
 class WrapX:

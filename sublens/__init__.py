@@ -1,7 +1,6 @@
 """
 General subhalo lensing framework.
 
-
 Intended to be used to measure, predict and fit the <\Delta\Sigma> profiles
 around subhalos (satelitte galaxies) embedded in clusters.
 

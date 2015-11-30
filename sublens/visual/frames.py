@@ -1,7 +1,7 @@
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-
+import matplotlib.ticker as plticker
 
 def add_prof(axt, axx, dtup, **kwargs):
     rr, dst, dsx = dtup[:3]
