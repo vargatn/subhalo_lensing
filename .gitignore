@@ -1,3 +1,7 @@
+workspace/cluster
+workspace/*.fit
+workspace/*.fits
+workspace/*.p
 settings.yaml
 build
 dist

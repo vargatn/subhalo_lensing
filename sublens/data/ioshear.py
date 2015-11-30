@@ -10,7 +10,7 @@ import pandas as pd
 import kmeans_radec as krd
 
 
-class ShearIO:
+class ShearIO_blabla:
 
     def __init__(self, info, data, cat, ra, dec, nbin=15, rmin=0.02, rmax=30.,
                  doc=""):

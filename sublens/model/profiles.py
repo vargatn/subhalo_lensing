@@ -17,10 +17,9 @@ import time
 import math
 import numpy as np
 from ..model.misc import nfw_pars
+# import jdnfw.nfw as jd_nfw
 
 from scipy import integrate as integr
-
-
 # -----------------------------------------------------------------------------
 # POOLABLE DECORATORS
 
@@ -31,42 +30,39 @@ def poolable_nfw_prof(params):
     return nfw_prof(**params)
 
 # -----------------------------------------------------------------------------
-# SHEAR PROFILE INTEGRATOR
+# DELTA SIGMA PROFILE
+
+# def nfw_prof(m200, c200, z, edges, **kwargs):
+#     rs, rho_s, r200 = nfw_pars(m200, c200, z)
 
 def nfw_prof(m200, c200, z, edges, epsabs=1.49e-4, epsrel=1.49e-8,
              verbose=False, **kwargs):
-    def gfun(val):
-        return 0.
-
-    def hfun(val):
-        return 2 * math.pi
 
     rs, rho_s, r200 = nfw_pars(m200, c200, z)
-    rho_s /= 1e12
     fargs = (rs, rho_s)
 
     areas = np.array([np.pi * (edges[i + 1] ** 2. - edges[i] ** 2.)
                       for i, edge in enumerate(edges[:-1])])
-
     cens = np.array([(edges[i + 1] ** 3. - edges[i] ** 3.) * 2. / 3. /
                      (edges[i + 1] ** 2. - edges[i] ** 2.)
                      for i, edge in enumerate(edges[:-1])])
 
     t0 = time.time()
-    sigma_rim = np.array([integr.dblquad(nfw_shear_t, edges[i], edges[i + 1],
-                                         gfun, hfun, args=fargs,
-                                         epsabs=epsabs, epsrel=epsrel)
+    sigma_rim = np.array([integr.quad(nfw_shear_t, edges[i], edges[i + 1],
+                                     args=fargs)
                           for i, val in enumerate(edges[:-1])])
+    sigma_rim = 2. * math.pi * sigma_rim / 1e12
+
     t1 = time.time()
     if verbose:
         print(t1 - t0, "s")
 
     ds = sigma_rim / areas[:, np.newaxis]
 
-    return cens, ds[:, 0], ds[:, 1]
+    return cens, ds[:, 0]
 
 
-def nfw_shear_t(phi, r, rs, rho_s):
+def nfw_shear_t(r, rs, rho_s):
     """
     RAW centered NFW halo
 
@@ -83,23 +79,59 @@ def nfw_shear_t(phi, r, rs, rho_s):
     shear = 0
 
     if 0. < x < 1.:
-        shear = rho_s * ((8. * math.atanh(math.sqrt((1. - x) / (1. + x))) / (
+        shear = rs * rho_s * ((8. * math.atanh(math.sqrt((1. - x) / (1. + x))) / (
             x ** 2. * math.sqrt(1. - x ** 2.)) +
                         4. / x ** 2. * math.log(x / 2.) - 2. / (x ** 2. - 1.) +
                         (4. * math.atanh(math.sqrt((1. - x) / (1. + x)))) / (
                             (x ** 2. - 1.) * math.sqrt(1. - x ** 2.))))
 
     elif x == 1.:
-        shear = rho_s * (10. / 3. + 4. * math.log(1. / 2.))
+        shear = rs * rho_s *(10. / 3. + 4. * math.log(1. / 2.))
 
     elif x > 1.:
-        shear = rho_s * ((8. * math.atan(math.sqrt((x - 1.) / (1. + x))) / (
+        shear = rs * rho_s *((8. * math.atan(math.sqrt((x - 1.) / (1. + x))) / (
             x ** 2. * math.sqrt(x ** 2. - 1.)) +
                         4. / x ** 2. * math.log(x / 2.) - 2. / (x ** 2. - 1) +
                         (4. * math.atan(math.sqrt((x - 1.) / (1. + x)))) / (
                             (x ** 2. - 1.) ** (3. / 2.))))
 
-    return shear
+    return shear * r
+
+
+def nfw_ds_direct(r, m200, c200, z):
+    rs, rho_s, r200 = nfw_pars(m200, c200, z)
+
+    x = r / rs
+
+    sigma = 0.0
+
+    if 0.0 < x < 1.0:
+        sigma = 2. * rs * rho_s / (x*x - 1.) *\
+                (1. - 2. / math.sqrt(1. - x*x) *
+                 math.atanh(math.sqrt((1. - x) / (1. + x))))
+    if x == 1.:
+        sigma = 2. * rs * rho_s / 3.
+    if x > 1.:
+        sigma = 2. * rs * rho_s / (x*x - 1.) *\
+                (1. - 2. / math.sqrt(x*x - 1.) *
+                 math.atan(math.sqrt((x - 1.) / (1. + x))))
+
+    smean = 0.0
+
+    if 0.0 < x < 1.0:
+        smean = 4. / (x*x) * rs * rho_s *\
+                (2. / math.sqrt(1. - x*x) *
+                 math.atanh(math.sqrt((1. - x) / (1. + x))) + math.log(x / 2.))
+    if x == 1.0:
+        smean = 4. * rs * rho_s * (1. + math.log(1. / 2.))
+    if x > 1.0:
+        smean = 4. / (x*x) * rs * rho_s *\
+                (2. / math.sqrt(x*x - 1.) *
+                 math.atan(math.sqrt((x - 1.) / (1. + x))) + math.log(x / 2.))
+
+    return smean - sigma
+
+
 
 # -----------------------------------------------------------------------------
 # EXAMPLE PROFILES

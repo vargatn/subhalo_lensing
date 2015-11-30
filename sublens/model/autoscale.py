@@ -17,7 +17,8 @@ def lm200_rykoff_orig(l, **kwargs):
     :return: M200 [M_sun / h100]
     """
     mpivot = 1e14 * 0.7  # msun / h100
-    m200 = np.exp(1.72 + 1.08 * np.log(l / 60.)) * mpivot
+    m200 = np.exp(1.48 + 1.06 * np.log(l / 60.)) * mpivot
+
     return m200
 
 
