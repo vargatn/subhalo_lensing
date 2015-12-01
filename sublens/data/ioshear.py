@@ -10,8 +10,22 @@ import pandas as pd
 import kmeans_radec as krd
 
 
-class ShearIO:
+class ShearData:
+    """
+    Container for individual shear profiles and corresponding lens catalog
 
+    Main Contents:
+    ---------------
+    data: shear profile data
+    cat:  lens catalog. same order as data
+    edges: bin edges
+    doc: description tag from WrapX
+
+    Additional important contents
+    cens: bin centers
+    areas: bin areas
+    info: shear profile info
+    """
     def __init__(self, info, data, cat, ra, dec, nbin=15, rmin=0.02, rmax=30.,
                  doc=""):
         self.info = info
@@ -136,7 +150,7 @@ class ShearIO:
         return names, info, data
 
     def prof_raw(self, ids=None, pw=None):
-        """calculates raw profile based on dataset"""
+        """DEPRECATED calculates raw profile based on dataset"""
 
         if ids is None:
             ids = np.arange(len(self.data[0, :, 0]))
@@ -164,12 +178,12 @@ class ShearIO:
         return rr, dst, dsx
 
     def prof_err(self, ids=None, pw=None, ncen=100, verbose=False):
-        """shorthand wrapper"""
+        """DEPRECATED shorthand wrapper"""
         return self.jack_err(self.ra, self.dec, ids=ids, pw=pw, ncen=ncen,
                              verbose=verbose)
 
     def jack_err(self, ra, dec, ids=None, pw=None, ncen=100, verbose=False):
-        """calculates raw profile based on dataset"""
+        """DEPRECATED calculates raw profile based on dataset"""
 
         if ids is None:
             ids = np.array(range(self.data.shape[1]))
@@ -223,12 +237,12 @@ class ShearIO:
         return rr, dst, dst_e, dsx, dsx_e
 
     def prof_cov(self, ids=None, pw=None, ncen=100, verbose=False):
-        """shorthand wrapper"""
+        """DEPRECATED shorthand wrapper"""
         return self.jack_cov(self.ra, self.dec, ids=ids, pw=pw, ncen=ncen,
                              verbose=verbose)
 
     def jack_cov(self, ra, dec, ids=None, pw=None, ncen=100, verbose=False):
-        """calculates raw profile based on dataset"""
+        """DEPRECATED calculates raw profile based on dataset"""
 
         if ids is None:
             ids = np.array(range(self.data.shape[1]))
