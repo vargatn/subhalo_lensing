@@ -2,15 +2,8 @@
 Module to create the observed side of the Modelling likelihood
 """
 
-import math
 import numpy as np
-from astropy.io import fits
-import pickle
-import pandas as pd
 import kmeans_radec as krd
-import bisect as bs
-
-
 
 class ProfileMaker:
     """
@@ -24,23 +17,31 @@ class ProfileMaker:
 
         self.km = None
 
+        self.dst = None
+        self.dsx = None
+
+        self.dst_cov = None
+        self.dsx_cov = None
+
     def all_id(self):
         """Calculates the union of all subpatches used"""
         aid = set([])
         for sub in self.subs:
             aid = aid.union(set(sub.ids))
 
-        aid = np.array(list(aid))
+        aid = np.sort(list(aid))
         return aid
 
     def re_ids(self):
-        """returns list of arrays which indexes aid for the subs"""
+        """
+        returns list of arrays which indexes km.labels so that
+        km.labels[reid[0]] gives the appropriate labels for sub0
+        """
         reid = []
-        argind = np.argsort(self.aid)
         for sub in self.subs:
-            tmp_ids = np.searchsorted(self.aid, sub.ids, sorter=argind)
-            reid.append(self.aid[argind][tmp_ids])
-        return  reid
+            tmp_ids = np.searchsorted(self.aid, sub.ids)
+            reid.append(tmp_ids)
+        return reid
 
     def radec_patches(self, ncen=100, verbose=False):
         """Calculates the specified number of k-means patches on the sky"""
@@ -55,7 +56,81 @@ class ProfileMaker:
         self.km = km
 
     def jack_profiles(self):
-        pass
+        """
+        Calculates jackknife estimate on the datat profiles and cov matrix
+        """
+        assert self.km is not None
+
+        ncen = len(self.km.centers)
+        nsub = len(self.subs)
+        dlen = len(self.shear_data.cens)
+
+        # length of data vector = dlen * nsub
+        dvec = np.zeros(dlen * nsub)
+        # indexing array which check which subpatch is to be used:
+        dvind = np.array([np.ones(dlen) * i for i in range(nsub)]).flatten()
+
+        # size of cov matrix = (len(dvec), len(dvec)
+        cov = np.zeros(shape=(len(dvec), len(dvec)))
+
+        # creating container for data estimates
+        dst_est = np.zeros((ncen, len(dvind)))
+        dsx_est = np.zeros((ncen, len(dvind)))
+
+        dsum_jack = np.zeros(shape=dvec.shape)
+        dsensum_jack = np.zeros(shape=dvec.shape)
+        osum_jack = np.zeros(shape=dvec.shape)
+        osensum_jack = np.zeros(shape=dvec.shape)
+
+        # calculating profiles for kmeans subpatches
+        for i, lab in enumerate(set(self.km.labels)):
+            for j, sub in enumerate(self.subs):
+                ind = np.where(self.km.labels[self.reid[j]] != lab)[0]
+                patch_ind = np.where(dvind == j)[0]
+
+                dsum_jack[patch_ind] = np.sum(self.shear_data.data[3, ind, :], axis=0)
+                dsensum_jack[patch_ind] = np.sum(self.shear_data.data[5, ind, :], axis=0)
+                osum_jack[patch_ind] = np.sum(self.shear_data.data[4, ind, :], axis=0)
+                osensum_jack[patch_ind] = np.sum(self.shear_data.data[6, ind, :], axis=0)
+
+            dst_est[i, :] = dsum_jack / dsensum_jack
+            dsx_est[i, :] = osum_jack / osensum_jack
+
+        dst = np.mean(dst_est, axis=0)
+        dsx = np.mean(dsx_est, axis=0)
+
+        dst_cov = np.array([[np.sum((dst_est[:, i] - dst[i]) * (dst_est[:, j] - dst[j])) for j in range(len(dvec))] for i in range(len(dvec))])
+        dst_cov *= (ncen - 1.) / ncen
+
+        dsx_cov = np.array([[np.sum((dsx_est[:, i] - dsx[i]) * (dsx_est[:, j] - dsx[j])) for j in range(len(dvec))] for i in range(len(dvec))])
+        dsx_cov *= (ncen - 1.) / ncen
+
+        self.dst = dst
+        self.dsx = dsx
+
+        self.dst_cov = dst_cov
+        self.dsx_cov = dsx_cov
+
+        return dst, dst_cov, dsx, dsx_cov
+
+    def simple_profiles(self):
+        """reformats the profiles into a readily plottable version"""
+        assert self.dst is not None
+        assert self.dsx is not None
+
+        assert self.dst_cov is not None
+        assert self.dsx_cov is not None
+
+        assert len(self.dst) == len(self.subs) * len(self.shear_data.cens)
+        arr_shape = (len(self.subs), len(self.shear_data.cens))
+
+        dst_arr = self.dst.reshape(arr_shape)
+        dsx_arr = self.dsx.reshape(arr_shape)
+
+        dst_err = np.sqrt(np.diag(self.dst_cov).reshape(arr_shape))
+        dsx_err = np.sqrt(np.diag(self.dsx_cov).reshape(arr_shape))
+
+        return dst_arr, dst_err, dsx_arr, dsx_err
 
 
 class ObsSpace:
