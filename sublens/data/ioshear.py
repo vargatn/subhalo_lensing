@@ -1,5 +1,5 @@
 """
-Class to document xshear calculations
+Classes to document and wrap xshear calculations
 """
 
 import math
@@ -16,15 +16,15 @@ class ShearData:
 
     Main Contents:
     ---------------
-    data: shear profile data
-    cat:  lens catalog. same order as data
-    edges: bin edges
-    doc: description tag from WrapX
+    - data: shear profile data
+    - cat:  lens catalog. same order as data
+    - edges: bin edges
+    - doc: description tag from WrapX
 
-    Additional important contents
-    cens: bin centers
-    areas: bin areas
-    info: shear profile info
+    Additional important contents:
+    - cens: bin centers
+    - areas: bin areas
+    - info: shear profile info
     """
     def __init__(self, info, data, cat, ra, dec, nbin=15, rmin=0.02, rmax=30.,
                  doc=""):
