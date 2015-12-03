@@ -10,6 +10,8 @@ import math
 #     def __init__(self, func, ):
         # pass
 
+# TODO deprecate this.
+# NOTE not used
 
 class LookupTable:
 
