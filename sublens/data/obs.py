@@ -177,7 +177,8 @@ class ObsSpace:
             par_ranges.update({key: (np.min(self.data[:, i]),
                                     np.max(self.data[:, i]))})
 
-        self.par_ranges = par_ranges
+        # self.par_ranges = par_ranges
+        return par_ranges
 
     def subpatcher(self, **kwargs):
         """
@@ -200,4 +201,5 @@ class ObsSpace:
         newids = self.ids[indtab]
 
         return ObsSpace(self.tracers, newids, newdata)
+
 

@@ -6,6 +6,11 @@ import pickle
 import math
 
 
+# class LookupTable:
+#     def __init__(self, func, ):
+        # pass
+
+
 class LookupTable:
 
     def __init__(self, func, grid_axes, extra_params, auto_params=None):

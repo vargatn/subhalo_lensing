@@ -6,6 +6,54 @@ THESE FUNCTIONS SHOULD BE PICKLEABLE
 
 import numpy as np
 
+class ScaleRel:
+
+    def __init__(self, func, req, prov, defpars):
+        self.func = func
+
+        # parameter types required
+        self.req = req
+        # parameter types provided
+        self.prov = prov
+
+        # default parameters
+        self.defpars = tuple(defpars)
+
+    def scale(self, vals):
+        return self.func(vals, self.defpars)
+
+    def fitscale(self, vals, pars):
+        return self.func(vals, pars)
+
+
+def lmscale(vals, pars, **kwargs):
+    """
+    Simple scaling function for [l, z] --> [m, z]
+    :param vals: values to scale [l, z]
+    :param pars: parameters: A, B, Lpiv, Mpiv
+    :return: [m, z]
+    """
+    A, B, Lpiv, Mpiv = pars
+
+    l, z = vals
+
+    m = np.exp(A + B * np.log(l / Lpiv)) * Mpiv
+
+    return m, z
+
+
+def cscale(vals, pars, **kwargs):
+    """
+    Scaling function for [m, z] --> [c, m, z]
+    :param vals: values to scale [m, zħ
+    :param pars: parameters: A, B, C, Mpiv
+    :return: [c, m, z]
+    """
+    m, z = vals
+    A, B, C, Mpiv = pars
+    c = A * (m / Mpiv) ** B * (1. + z) ** C
+    return c, m, z
+
 
 def lm200_rykoff_orig(l, **kwargs):
     """

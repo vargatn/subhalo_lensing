@@ -54,6 +54,9 @@ class ShearData:
                    rmin=log['rmin'], rmax=log['rmax'], doc=log['doc'])
         return sio1
 
+    def getbins(self):
+        return self.cens, self.edges, self.areas
+
     @staticmethod
     def redges(rmin, rmax, nbin):
         """calculates true edges and center for logarithmic bins"""
