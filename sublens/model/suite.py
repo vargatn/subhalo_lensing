@@ -3,6 +3,8 @@ __author__ = 'vtn'
 import numpy as np
 from .profiles import nfw_pars
 from astropy.cosmology import FlatLambdaCDM
+import multiprocessing as multi
+import collections
 
 
 class ModelProf:
@@ -33,6 +35,18 @@ class ModelProf:
         self.mofunc = mofunc
 
         self.mpars = mofunc.req
+
+        # predeclaring params
+        self.t_scaling = None
+        self.tf_edges = None
+        self.ctgrid = None
+        self.subgrid = None
+
+        self.m_scaling = None
+        self.mf_edges = None
+        self.cmgrid = None
+
+        self.ref_list = None
 
 
     def t_frame(self, dens=200, logpars=()):
@@ -75,6 +89,7 @@ class ModelProf:
         for i, sub in enumerate(self.subarr):
             hist = np.histogramdd(sub.data, bins=self.tf_edges)
             subgrid.append(hist[0])
+            # print(hist[0].shape)
 
         self.subgrid  = np.array(subgrid)
 
@@ -82,6 +97,16 @@ class ModelProf:
         """
         creates a sufficiently dense model frame for model func evaluation
         """
+
+        if not isinstance(dens, collections.Sequence):
+            adens = [dens for i in enumerate(self.priscale.prov)]
+        else:
+            adens = dens
+
+        # print(adens)
+        # if dens is int or dens is float:
+        # dens = [dens]* len(self.m_scaling)
+
         #obtain edges for model frame
         m_edges = np.array([range[key] for key in self.priscale.prov])
 
@@ -96,18 +121,81 @@ class ModelProf:
             if msc == 'log':
                 mf_edges.append(np.logspace(np.log10(m_edges[i, 0]),
                                                np.log10(m_edges[i, 1]),
-                                               num=dens))
+                                               num=adens[i]))
             elif msc == 'lin':
                 mf_edges.append(np.linspace(m_edges[i, 0], m_edges[i, 1],
-                                               num=dens))
+                                               num=adens[i]))
 
-        self.tf_edges = np.array(mf_edges)
-
+        self.mf_edges = mf_edges
+        # print(self.mf_edges.shape)
         # calculating grid centers
         frame_cens = []
         for e in mf_edges:
             frame_cens.append(e[:-1] + np.diff(e) / 2.)
         self.cmgrid = np.array(np.meshgrid(*frame_cens, indexing='ij'))
+
+    def build_lookup(self, n_multi=1):
+        """calculates reference profiles"""
+        assert self.mf_edges is not None
+        assert self.cmgrid is not None
+
+        # creating complete model table for grid evaluation
+        # pgrid = np.rollaxis(self.cmgrid, 0, start=len(self.cmgrid.shape))
+        mgrid_shape = self.cmgrid.shape[1:]
+        pflat = np.array([arr.flatten() for arr in self.cmgrid]).T
+
+        self.model_flat = np.array([self.secscale.scale(par) for par in pflat])
+        # print(self.model_flat)
+        # print(self.model_flat.shape)
+        # TODO add multiprocessing call here
+
+        ref_list = np.array([self.mofunc.point_eval(pars)
+                             for pars in self.model_flat])
+
+        self.ref_list = ref_list
+
+    def scale_frame(self, pars):
+        """transforms the t_frame to m_frame"""
+        assert self.ref_list is not None
+
+        # first calculate which cell points to which other,
+        #  by scaling each center point
+        # print(self.ctgrid.shape)
+        cflat = np.array([arr.flatten() for arr in self.ctgrid]).T
+        mdist = np.array([self.priscale.fitscale(val, pars) for val in cflat])
+
+        self.mdist = mdist
+
+        # for each sub calculate the model space distribution
+        self.subdist = []
+        for i, sub in enumerate(self.subarr):
+            counts = self.subgrid[i].flatten()
+            # print(counts.shape)
+            self.subdist.append(np.histogramdd(mdist, bins=self.mf_edges,
+                                               weights=counts)[0])
+            # print(self.subdist[i].shape)
+
+        self.subdist = np.array(self.subdist)
+
+    def collapse_profiles(self):
+        """Creates prediction profiles for each subatch"""
+
+        rr_values = self.ref_list[0, 0, :]
+        ds_profiles = self.ref_list[:, 1, :]
+        # print(ds_profiles.shape)
+        # print(rr_values.shape)
+        prof_y = []
+        for i, sub in enumerate(self.subarr):
+            counts = self.subdist[i].flatten()
+            prof_y.append(np.average(ds_profiles, weights=counts, axis=0))
+
+        self.prof_y = np.array(prof_y)
+        self.prof_x = np.array([rr_values for val in prof_y])
+
+        # creating data vector
+        self.model = self.prof_y.flatten()
+        self.rr = self.prof_x.flatten()
+#
 
 
 

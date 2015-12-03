@@ -35,10 +35,11 @@ def poolable_nfw_prof(params):
 # def nfw_prof(m200, c200, z, edges, **kwargs):
 #     rs, rho_s, r200 = nfw_pars(m200, c200, z)
 
-def nfw_prof(m200, c200, z, edges, epsabs=1.49e-4, epsrel=1.49e-8,
-             verbose=False, **kwargs):
+def nfw_prof(c200, m200, z, edges, epsabs=1.49e-4, epsrel=1.49e-8,
+             verbose=False):
 
     rs, rho_s, r200 = nfw_pars(m200, c200, z)
+    # print(rs, rho_s, r200)
     fargs = (rs, rho_s)
 
     areas = np.array([np.pi * (edges[i + 1] ** 2. - edges[i] ** 2.)
