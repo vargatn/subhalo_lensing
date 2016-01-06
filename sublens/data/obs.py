@@ -181,12 +181,14 @@ class ProfileMaker:
         prof.indexes = [np.where(prof.labels != ind)[0]
                         for ind in prof.sub_labels]
 
+        print(prof.indexes[0])
+
         # indexes of clusters not in subsample i
         prof.non_indexes = [np.where(prof.labels == ind)[0]
                             for ind in prof.sub_labels]
 
         # does the p-th subpatch has counts for radial bin r?
-        prof.subcounts = np.array([np.sum(self.sd.data[0, ind, :], axis=0)
+        prof.subcounts = np.array([np.sum(self.sd.data[0, sub.ids[ind], :], axis=0)
                                    for ind in prof.indexes])
         prof.hasval = [np.nonzero(arr.astype(bool))[0]
                        for arr in prof.subcounts]
@@ -199,12 +201,12 @@ class ProfileMaker:
 
             cind = prof.hasval[i]
 
-            dsum_jack = np.sum(self.sd.data[3, ind][:, cind], axis=0)
-            dsensum_jack = np.sum(self.sd.data[5, ind][:, cind], axis=0)
+            dsum_jack = np.sum(self.sd.data[3, sub.ids[ind]][:, cind], axis=0)
+            dsensum_jack = np.sum(self.sd.data[5, sub.ids[ind]][:, cind], axis=0)
             prof.dst_sub[cind, lab] = dsum_jack / dsensum_jack
 
-            osum_jack = np.sum(self.sd.data[4, ind][:, cind], axis=0)
-            osensum_jack = np.sum(self.sd.data[6, ind][:, cind], axis=0)
+            osum_jack = np.sum(self.sd.data[4, sub.ids[ind]][:, cind], axis=0)
+            osensum_jack = np.sum(self.sd.data[6, sub.ids[ind]][:, cind], axis=0)
             prof.dsx_sub[cind, lab] = osum_jack / osensum_jack
 
         # calculating the JK estimate on the mean profile
