@@ -6,7 +6,7 @@ import numpy as np
 
 
 class Likelihood:
-    def __init__(self, profmaker, modelprof):
+    def __init__(self, profmaker, modelprof, ind=None):
 
         # checking if everything is prepared
         assert profmaker.dst is not None
@@ -14,8 +14,11 @@ class Likelihood:
         assert profmaker.dst_cov is not None
         assert profmaker.dsx_cov is not None
 
-        assert modelprof.ref_list is not None
+        # assert modelprof.ref_list is not None
 
+        self.ind = ind
+        if self.ind is None:
+            self.ind = np.arange(len(profmaker.dst_cov))
 
         self.profmaker = profmaker
         self.modelprof = modelprof
@@ -39,10 +42,13 @@ class Likelihood:
 
         model = self.modelprof.model
 
-        delta = self.dst - model
+        delta = np.zeros(shape=model.shape)
+        delta[self.ind] = (self.dst - model)[self.ind]
+
+        # print(delta)
 
         chi2 = 1. / 2. * np.dot(delta.T, np.dot(self.cinvt, delta))
-
+        # print(chi2)
         return chi2
 
 
@@ -85,6 +91,8 @@ class MCMC:
         self.usind = np.array(np.where(np.isnan(dpar) == 0)[0])
 
         for i in np.arange(nstep):
+            if i%100 ==0:
+                print(i)
             step = self.randomstep()
             new_par = par_old + step
 

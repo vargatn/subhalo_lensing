@@ -10,6 +10,7 @@ class ProfileMaker:
     Calculates measured shear profile based on the specified subpatches
     """
     def __init__(self, shear_data, *args):
+        self.edges = shear_data.edges
         self.shear_data = shear_data
         self.subs = args
         self.aid = self.all_id() # union of all sub.ids
@@ -179,6 +180,21 @@ class ObsSpace:
 
         # self.par_ranges = par_ranges
         return par_ranges
+
+
+    def forget(self, *args):
+        """Forgets the specified tracers"""
+
+        tracers = np.asanyarray(self.tracers)
+        keepind = set(range(len(tracers)))
+        for arg in args:
+            keepind = keepind.intersection(set(np.where(arg != tracers)[0]))
+
+        keepind = list(keepind)
+        # print(keepind)
+        newdata = self.data[:, keepind]
+        return ObsSpace(list(tracers[keepind]), self.ids, newdata)
+
 
     def subpatcher(self, **kwargs):
         """

@@ -7,6 +7,8 @@ import multiprocessing as multi
 import collections
 
 
+
+
 class ModelProf:
 
     def __init__(self, subarr, priscale, secscale, mofunc):
@@ -195,10 +197,46 @@ class ModelProf:
         # creating data vector
         self.model = self.prof_y.flatten()
         self.rr = self.prof_x.flatten()
-#
 
 
+class ExactProf(ModelProf):
 
+    # def par_join(self):
+    #     self.ctarr = [sub.data for sub in self.subarr]
+
+
+    def scale_frame(self, pars):
+        """transforms  to exact parameters"""
+        carr = [sub.data for sub in self.subarr]
+        # cflat = self.subarr[0].data
+
+        mdarr = [np.array([self.priscale.fitscale(val, pars)
+                           for val in cflat])
+                 for cflat in carr]
+        # mdist = np.array([self.priscale.fitscale(val, pars) for val in cflat])
+
+        # pdist = np.array([self.secscale.scale(par) for par in mdist])
+        pdist = [np.array([self.secscale.scale(par) for par in mdist]) for mdist in mdarr]
+        self.pdist = pdist
+
+    def collapse_profiles(self):
+
+        self.prof_x = []
+        self.prof_y = []
+        for pd in self.pdist:
+            ref_list = np.array([self.mofunc.point_eval(pars) for pars in pd])
+            # print(ref_list.shape)
+            self.prof_x.append(ref_list[0, 0, :])
+            # print(np.mean(ref_list[:, 1, :], axis=0).shape)
+            self.prof_y.append(np.average(ref_list[: 1, :], axis=0))
+
+        self.prof_x = np.asarray(self.prof_x)
+        self.prof_y = np.asarray(self.prof_y)
+
+        self.model = self.prof_y[:, 1, :].flatten()
+        self.rr = self.prof_x.flatten()
+
+        return self.prof_x, self.prof_y[:, 1, :]
 
 
 

@@ -17,7 +17,7 @@ import time
 import math
 import numpy as np
 from ..model.misc import nfw_pars
-# import jdnfw.nfw as jd_nfw
+import jdnfw.nfw as jd_nfw
 
 from scipy import integrate as integr
 # -----------------------------------------------------------------------------
@@ -32,8 +32,29 @@ def poolable_nfw_prof(params):
 # -----------------------------------------------------------------------------
 # DELTA SIGMA PROFILE
 
+
 # def nfw_prof(m200, c200, z, edges, **kwargs):
 #     rs, rho_s, r200 = nfw_pars(m200, c200, z)
+
+def nfw_prof_noint(c200, m200, z, edges):
+    rs, rho_s, r200 = nfw_pars(m200, c200, z)
+    # print(rs, rho_s)
+    areas = np.array([np.pi * (edges[i + 1] ** 2. - edges[i] ** 2.)
+                      for i, edge in enumerate(edges[:-1])])
+    cens = np.array([(edges[i + 1] ** 3. - edges[i] ** 3.) * 2. / 3. /
+                     (edges[i + 1] ** 2. - edges[i] ** 2.)
+                     for i, edge in enumerate(edges[:-1])])
+
+    # print(cens)
+    # print(rs)
+    ds = np.array([nfw_shear_t(cen, rs, rho_s) / cen
+                   for i, cen in enumerate(cens)])
+
+    ds = ds / 1e12
+    # ds = ds / 1e12 * np.pi * 2.
+
+    return cens, ds
+
 
 def nfw_prof(c200, m200, z, edges, epsabs=1.49e-4, epsrel=1.49e-8,
              verbose=False):

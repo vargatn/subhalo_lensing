@@ -38,6 +38,7 @@ def lmscale(vals, pars, **kwargs):
     l, z = vals
 
     m = np.exp(A + B * np.log(l / Lpiv)) * Mpiv
+    # print(m, z)
 
     return m, z
 
@@ -66,6 +67,7 @@ def lm200_rykoff_orig(l, **kwargs):
     """
     mpivot = 1e14 * 0.7  # msun / h100
     m200 = np.exp(1.48 + 1.06 * np.log(l / 60.)) * mpivot
+
 
     return m200
 
