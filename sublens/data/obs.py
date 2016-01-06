@@ -2,6 +2,7 @@
 Module to create the observed side of the Modelling likelihood
 """
 
+import pickle
 import numpy as np
 import kmeans_radec as krd
 
@@ -102,6 +103,10 @@ class ProfileMaker:
         self.km = None
         self.centers = None
 
+        self.proflist = None
+        self.cov_t = None
+        self.cov_x = None
+
     def all_id(self):
         """Calculates the union of all subpatches used"""
         aid = set([])
@@ -138,6 +143,63 @@ class ProfileMaker:
 
         self.km = km
         self.centers = km.centers
+
+    def all_profiles(self):
+        """calculates all \Delta\Sigma profiles and the joint covariance"""
+
+        # caclualting all profiles
+        self.proflist = [self.make_profile(sub) for sub in self.subs]
+
+        # creating data vectors for joint covariance
+        self.rvec = np.array([prof.rr for prof in self.proflist]).flatten()
+        self.dtvec = np.array([prof.dst for prof in self.proflist]).flatten()
+        self.dxvec = np.array([prof.dsx for prof in self.proflist]).flatten()
+
+        dlen = len(self.dtvec)
+        rlen = self.sd.nbin
+
+        # containers for the matrices
+        self.cov_t= np.zeros(shape=(dlen, dlen))
+        self.cov_x= np.zeros(shape=(dlen, dlen))
+
+        for i1 in range(dlen):
+            p1 = i1 // rlen
+            pc1 = self.proflist[p1]
+            r1 = i1 % rlen
+            for i2 in range(dlen):
+                p2 = i2 // rlen
+                pc2 = self.proflist[p2]
+                r2 = i2 % rlen
+
+                if pc1.njk[r1] > 0 and pc2.njk[r2] > 0:
+
+                    subind1 = pc1.sub_labels[np.nonzero(pc1.subcounts[:, r1])[0]]
+                    subind2 = pc2.sub_labels[np.nonzero(pc2.subcounts[:, r2])[0]]
+                    subind = list(set(subind1).intersection(set(subind2)))
+
+                    part1_t = (pc1.dst_sub[r1, subind] - pc1.dst[r1])
+                    part2_t = (pc2.dst_sub[r2, subind] - pc2.dst[r2])
+
+                    part1_x = (pc1.dsx_sub[r1, subind] - pc1.dsx[r1])
+                    part2_x = (pc2.dsx_sub[r2, subind] - pc2.dsx[r2])
+
+                    navail = len(subind)
+                    assert(navail >= 1)
+                    self.cov_t[i1, i2] = np.sum(part1_t * part2_t) * (navail - 1.) / navail
+                    self.cov_x[i1, i2] = np.sum(part1_x * part2_x) * (navail - 1.) / navail
+
+                    
+
+    def save_profiles(self, sname="profiles.p"):
+        """saves profiles"""
+
+        logdict = {
+            'profiles': self.proflist,
+            'cov_t': self.cov_t,
+            'cov_x': self.cov_x,
+        }
+
+        pickle.dump(logdict, open(sname, "wb"))
 
     def make_profile(self, sub):
         """
@@ -181,8 +243,6 @@ class ProfileMaker:
         prof.indexes = [np.where(prof.labels != ind)[0]
                         for ind in prof.sub_labels]
 
-        print(prof.indexes[0])
-
         # indexes of clusters not in subsample i
         prof.non_indexes = [np.where(prof.labels == ind)[0]
                             for ind in prof.sub_labels]
@@ -217,6 +277,30 @@ class ProfileMaker:
                 prof.dst[r] = np.sum(prof.dst_sub[r, subind]) / prof.njk[r]
                 prof.dsx[r] = np.sum(prof.dsx_sub[r, subind]) / prof.njk[r]
 
+
+        # print(prof.dst_cov.shape)
+        # calculating the covariance
+        for r1 in range(self.sd.nbin):
+            for r2 in range(self.sd.nbin):
+                if prof.njk[r1] > 0 and prof.njk[r2] > 0:
+                    subind1 = prof.sub_labels[np.nonzero(prof.subcounts[:, r1])[0]]
+                    subind2 = prof.sub_labels[np.nonzero(prof.subcounts[:, r2])[0]]
+                    subind = list(set(subind1).intersection(set(subind2)))
+
+                    prof.dst_cov[r1, r2] = np.sum((prof.dst_sub[r1, subind] -
+                                                   prof.dst[r1]) *
+                                                  (prof.dst_sub[r2, subind] -
+                                                   prof.dst[r2])) *\
+                                           (prof.njk[r] - 1.0) / prof.njk[r]
+                    prof.dsx_cov[r1, r2] = np.sum((prof.dsx_sub[r1, subind] -
+                                                   prof.dsx[r1]) *
+                                                  (prof.dsx_sub[r2, subind] -
+                                                   prof.dsx[r2])) *\
+                                           (prof.njk[r] - 1.0) / prof.njk[r]
+
+        prof.dst_err = np.sqrt(np.diag(prof.dst_cov))
+        prof.dsx_err = np.sqrt(np.diag(prof.dsx_cov))
+
         return prof
 
 
@@ -234,6 +318,7 @@ class SingleProfile:
         self.nzind = None
         self.subcounts = None
         self.hasval = None
+        self.njk = None
 
         # by default the radial bins are set to -1.0, to indicate missing data
         self.rr = np.ones(self.nbin) * -1.0
@@ -255,133 +340,7 @@ class SingleProfile:
         self.dsx_err = np.zeros(self.nbin)
 
 
-class ProfileMaker2:
-    """
-    Calculates measured shear profile based on the specified subpatches
-    """
-    def __init__(self, shear_data, *args):
-        self.edges = shear_data.edges
-        self.shear_data = shear_data
-        self.subs = args
-        self.aid = self.all_id() # union of all sub.ids
-        self.reid = self.re_ids()
 
-        self.km = None
-
-        self.dst = None
-        self.dsx = None
-
-        self.dst_cov = None
-        self.dsx_cov = None
-
-    def all_id(self):
-        """Calculates the union of all subpatches used"""
-        aid = set([])
-        for sub in self.subs:
-            aid = aid.union(set(sub.ids))
-
-        aid = np.sort(list(aid))
-        return aid
-
-    def re_ids(self):
-        """
-        returns list of arrays which indexes km.labels so that
-        km.labels[reid[0]] gives the appropriate labels for sub0
-        """
-        reid = []
-        for sub in self.subs:
-            tmp_ids = np.searchsorted(self.aid, sub.ids)
-            reid.append(tmp_ids)
-        return reid
-
-    def radec_patches(self, ncen=100, verbose=False):
-        """Calculates the specified number of k-means patches on the sky"""
-        X = np.vstack((self.shear_data.ra[self.aid],
-                       self.shear_data.dec[self.aid])).T
-        nsample = X.shape[0] // 2
-        km = krd.kmeans_sample(X, ncen=ncen, nsample=nsample, verbose=verbose)
-
-        if not km.converged:
-            km.run(X, maxiter=100)
-
-        self.km = km
-
-    def jack_profiles(self):
-        """
-        Calculates jackknife estimate on the datat profiles and cov matrix
-        """
-        assert self.km is not None
-
-        ncen = len(self.km.centers)
-        nsub = len(self.subs)
-        dlen = len(self.shear_data.cens)
-
-        # length of data vector = dlen * nsub
-        dvec = np.zeros(dlen * nsub)
-        # indexing array which check which subpatch is to be used:
-        dvind = np.array([np.ones(dlen) * i for i in range(nsub)]).flatten()
-
-        # size of cov matrix = (len(dvec), len(dvec)
-        cov = np.zeros(shape=(len(dvec), len(dvec)))
-
-        # creating container for data estimates
-        dst_est = np.zeros((ncen, len(dvind)))
-        dsx_est = np.zeros((ncen, len(dvind)))
-
-        dsum_jack = np.zeros(shape=dvec.shape)
-        dsensum_jack = np.zeros(shape=dvec.shape)
-        osum_jack = np.zeros(shape=dvec.shape)
-        osensum_jack = np.zeros(shape=dvec.shape)
-
-        # calculating profiles for kmeans subpatches
-        for i, lab in enumerate(set(self.km.labels)):
-            for j, sub in enumerate(self.subs):
-                ind = np.where(self.km.labels[self.reid[j]] != lab)[0]
-                patch_ind = np.where(dvind == j)[0]
-
-                dsum_jack[patch_ind] = np.sum(self.shear_data.data[3, ind, :], axis=0)
-                dsensum_jack[patch_ind] = np.sum(self.shear_data.data[5, ind, :], axis=0)
-                osum_jack[patch_ind] = np.sum(self.shear_data.data[4, ind, :], axis=0)
-                osensum_jack[patch_ind] = np.sum(self.shear_data.data[6, ind, :], axis=0)
-
-            dst_est[i, :] = dsum_jack / dsensum_jack
-            dsx_est[i, :] = osum_jack / osensum_jack
-
-        dst = np.mean(dst_est, axis=0)
-        dsx = np.mean(dsx_est, axis=0)
-
-        dst_cov = np.array([[np.sum((dst_est[:, i] - dst[i]) * (dst_est[:, j] - dst[j])) for j in range(len(dvec))] for i in range(len(dvec))])
-        dst_cov *= (ncen - 1.) / ncen
-
-        dsx_cov = np.array([[np.sum((dsx_est[:, i] - dsx[i]) * (dsx_est[:, j] - dsx[j])) for j in range(len(dvec))] for i in range(len(dvec))])
-        dsx_cov *= (ncen - 1.) / ncen
-
-        self.dst = dst
-        self.dsx = dsx
-
-        self.dst_cov = dst_cov
-        self.dsx_cov = dsx_cov
-
-        return dst, dst_cov, dsx, dsx_cov
-
-    def simple_profiles(self):
-        """reformats the profiles into a readily plottable version"""
-        assert self.dst is not None
-        assert self.dsx is not None
-
-        assert self.dst_cov is not None
-        assert self.dsx_cov is not None
-
-        assert len(self.dst) == len(self.subs) * len(self.shear_data.cens)
-        arr_shape = (len(self.subs), len(self.shear_data.cens))
-
-        dst_arr = self.dst.reshape(arr_shape)
-        dsx_arr = self.dsx.reshape(arr_shape)
-
-        dst_err = np.sqrt(np.diag(self.dst_cov).reshape(arr_shape))
-        dsx_err = np.sqrt(np.diag(self.dsx_cov).reshape(arr_shape))
-
-        return dst_arr, dst_err, dsx_arr, dsx_err
 
 
 
