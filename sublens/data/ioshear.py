@@ -9,7 +9,7 @@ import pickle
 import pandas as pd
 
 
-class ShearData:
+class ShearData(object):
     """
     Container for individual shear profiles and corresponding lens catalog
 
@@ -180,7 +180,7 @@ class ShearData:
         return rr, dst, dsx
 
 
-class WrapX:
+class WrapX(object):
 
     def __init__(self, name, lens_path, source_path, xshear_path, h0=100.,
                  omega_m=0.3, healpix_nside=64, nbin=15, rmin=0.02, rmax=30,

@@ -6,7 +6,8 @@ import pickle
 import numpy as np
 import kmeans_radec as krd
 
-class ObsSpace:
+
+class ObsSpace(object):
     """
     Parameter space for the directly observed parameters
 
@@ -53,7 +54,6 @@ class ObsSpace:
         # self.par_ranges = par_ranges
         return par_ranges
 
-
     def forget(self, *args):
         """Forgets the specified tracers"""
 
@@ -88,8 +88,45 @@ class ObsSpace:
 
         return ObsSpace(self.tracers, newids, newdata)
 
+    def get_container(self):
+        """returns the easily pickleable container"""
+        return SpaceContainer(self.tracers, self.data, self.ids,
+                              self.par_ranges)
 
-class ProfileMaker:
+    @classmethod
+    def from_container(cls, cont):
+        return cls(cont.tracers, cont.ids, cont.data)
+
+
+def save_subs(sname, subs, tag=''):
+    """pickles the subpatches"""
+
+    contlist = [sub.get_container() for sub in subs]
+    logdict = {
+        'tag': tag,
+        'contlist': contlist,
+    }
+    pickle.dump(logdict, open(sname, "wb"))
+
+
+def load_subs(lname):
+    """unpickles subpatches"""
+    logdict = pickle.load(open(lname, "rb"))
+
+    sublist = [ObsSpace.from_container(cont) for cont in logdict['contlist']]
+
+    return logdict['tag'], sublist
+
+
+class SpaceContainer(object):
+    def __init__(self, tracers, data, ids, par_ranges):
+        self.tracers = tracers
+        self.data = data
+        self.ids = ids
+        self.par_ranges = par_ranges
+
+
+class ProfileMaker(object):
     """
     Calculates measured shear profile based on the specified subpatches
     """
@@ -173,8 +210,10 @@ class ProfileMaker:
 
                 if pc1.njk[r1] > 0 and pc2.njk[r2] > 0:
 
-                    subind1 = pc1.sub_labels[np.nonzero(pc1.subcounts[:, r1])[0]]
-                    subind2 = pc2.sub_labels[np.nonzero(pc2.subcounts[:, r2])[0]]
+                    subind1 = pc1.sub_labels[np.nonzero(
+                        pc1.subcounts[:, r1])[0]]
+                    subind2 = pc2.sub_labels[np.nonzero(
+                        pc2.subcounts[:, r2])[0]]
                     subind = list(set(subind1).intersection(set(subind2)))
 
                     part1_t = (pc1.dst_sub[r1, subind] - pc1.dst[r1])
@@ -185,15 +224,16 @@ class ProfileMaker:
 
                     navail = len(subind)
                     assert(navail >= 1)
-                    self.cov_t[i1, i2] = np.sum(part1_t * part2_t) * (navail - 1.) / navail
-                    self.cov_x[i1, i2] = np.sum(part1_x * part2_x) * (navail - 1.) / navail
+                    self.cov_t[i1, i2] = np.sum(part1_t * part2_t) *\
+                                         (navail - 1.) / navail
+                    self.cov_x[i1, i2] = np.sum(part1_x * part2_x) *\
+                                         (navail - 1.) / navail
 
-                    
-
-    def save_profiles(self, sname="profiles.p"):
+    def save_profiles(self, sname="profiles.p", tag=''):
         """saves profiles"""
 
         logdict = {
+            'tag': tag,
             'profiles': self.proflist,
             'cov_t': self.cov_t,
             'cov_x': self.cov_x,
@@ -304,8 +344,7 @@ class ProfileMaker:
         return prof
 
 
-
-class SingleProfile:
+class SingleProfile(object):
     def __init__(self, nbin, ncen):
         """Container for a single profile"""
         self.nbin = nbin # number of radial bins for the profile
