@@ -288,6 +288,7 @@ class WrapX(object):
     def prepall(self):
         self.config()
         self.write_lens()
+        self.write_script(check=True)
         self.write_script()
         self.write_log()
 
