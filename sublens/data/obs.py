@@ -100,7 +100,6 @@ class ObsSpace(object):
 
 def save_subs(sname, subs, tag=''):
     """pickles the subpatches"""
-
     contlist = [sub.get_container() for sub in subs]
     logdict = {
         'tag': tag,
@@ -112,9 +111,7 @@ def save_subs(sname, subs, tag=''):
 def load_subs(lname):
     """unpickles subpatches"""
     logdict = pickle.load(open(lname, "rb"))
-
     sublist = [ObsSpace.from_container(cont) for cont in logdict['contlist']]
-
     return logdict['tag'], sublist
 
 
@@ -231,14 +228,12 @@ class ProfileMaker(object):
 
     def save_profiles(self, sname="profiles.p", tag=''):
         """saves profiles"""
-
         logdict = {
             'tag': tag,
             'profiles': self.proflist,
             'cov_t': self.cov_t,
             'cov_x': self.cov_x,
         }
-
         pickle.dump(logdict, open(sname, "wb"))
 
     def make_profile(self, sub):
@@ -317,7 +312,6 @@ class ProfileMaker(object):
                 prof.dst[r] = np.sum(prof.dst_sub[r, subind]) / prof.njk[r]
                 prof.dsx[r] = np.sum(prof.dsx_sub[r, subind]) / prof.njk[r]
 
-
         # print(prof.dst_cov.shape)
         # calculating the covariance
         for r1 in range(self.sd.nbin):
@@ -343,6 +337,11 @@ class ProfileMaker(object):
 
         return prof
 
+def load_profiles(lname):
+    """unpickles profiles"""
+    logdict = pickle.load(open(lname, 'rb'))
+    return logdict['tag'], logdict['profiles'], logdict['cov_t'],\
+           logdict['cov_x']
 
 class SingleProfile(object):
     def __init__(self, nbin, ncen):

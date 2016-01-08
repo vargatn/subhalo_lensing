@@ -42,7 +42,7 @@ class ShearData(object):
     def from_file(cls, fname):
         """loads data file from WrapX log"""
         log = pickle.load(open(fname, "rb"))
-
+        print(log)
         names, info, data = cls.xout(log['res_name'], mode='dat')
         cat = fits.open(log["lens_path"])[1].data
         lens_file = np.loadtxt(log['lens_name'])
@@ -150,34 +150,6 @@ class ShearData(object):
         assert (info[:, 2] == np.sum(data[0, :, :], axis=1)).all()
 
         return names, info, data
-
-    def prof_raw(self, ids=None, pw=None):
-        """DEPRECATED calculates raw profile based on dataset"""
-
-        if ids is None:
-            ids = np.arange(len(self.data[0, :, 0]))
-        idata = self.data[:, ids, :]
-
-        if pw is None:
-            pw = np.expand_dims(np.ones(len(idata[0, :, 0])), axis=1)
-
-        psum = np.sum(pw)
-
-        rr = np.sum(np.multiply(idata[1, :, :], pw), axis=0) /\
-             np.sum(np.multiply(idata[2, :, :], pw), axis=0)
-
-        dsum = np.sum(np.multiply(idata[3, :, :], pw), axis=0) / psum
-
-        dsensum = np.sum(np.multiply(idata[5, :, :], pw), axis=0) / psum
-
-        osum = np.sum(np.multiply(idata[4, :, :], pw), axis=0) / psum
-
-        osensum = np.sum(np.multiply(idata[6, :, :], pw), axis=0) / psum
-
-        dst = dsum / dsensum
-        dsx = osum / osensum
-
-        return rr, dst, dsx
 
 
 class WrapX(object):
