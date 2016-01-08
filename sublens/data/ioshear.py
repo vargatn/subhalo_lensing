@@ -213,7 +213,7 @@ class WrapX(object):
                'sigmacrit_style   = "interp"\n' +\
                "zlvals = " + str(self.zlvals)
 
-        cfile = open(self.config_name, 'w')
+        cfile = open(self.base_path + self.config_name, 'w')
         cfile.write(conf)
         cfile.close()
 
@@ -231,7 +231,7 @@ class WrapX(object):
         if mode == "fits":
             ldata = fits.open(self.lens_path)[1].data
         else:
-            raise TypeError("currently only fits files are supported")
+            raise NotImplementedError("currently only fits files are supported")
 
         if ids == "cat_matched":
             ids = np.arange(len(ldata[ra]))
@@ -242,7 +242,7 @@ class WrapX(object):
 
         fmt = ["%d", "%.18f", "%.18f", "%.18f", "%d"]
 
-        np.savetxt(self.lens_name, lens, fmt=fmt)
+        np.savetxt(self.base_path + self.lens_name, lens, fmt=fmt)
 
     def write_log(self):
 
@@ -267,7 +267,7 @@ class WrapX(object):
 
         }
 
-        pickle.dump(log_dict, open(self.log_name, "wb"))
+        pickle.dump(log_dict, open(self.base_path + self.log_name, "wb"))
 
     def write_script(self, check=False):
         """executable xshear script"""
@@ -281,7 +281,7 @@ class WrapX(object):
         script += self.xshear_path + " " + self.config_name + " " +\
                   self.lens_name + " > " + self.res_name
 
-        sfile = open(self.name + ".sh", "w")
+        sfile = open(self.base_path + self.name + ".sh", "w")
         sfile.write(script)
         sfile.close()
 
