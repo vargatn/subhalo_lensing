@@ -7,6 +7,7 @@ import numpy as np
 from astropy.io import fits
 import pickle
 import pandas as pd
+import os
 
 
 class ShearData(object):
@@ -41,11 +42,15 @@ class ShearData(object):
     @classmethod
     def from_file(cls, fname):
         """loads data file from WrapX log"""
+
+        head, tail = os.path.split(fname)
+        head += '/'
+        # print(head, tail)
         log = pickle.load(open(fname, "rb"))
-        print(log)
-        names, info, data = cls.xout(log['res_name'], mode='dat')
-        cat = fits.open(log["lens_path"])[1].data
-        lens_file = np.loadtxt(log['lens_name'])
+        # print(head + log['res_name'])
+        names, info, data = cls.xout(head + log['res_name'], mode='dat')
+        cat = fits.open(head + log["lens_path"])[1].data
+        lens_file = np.loadtxt(head + log['lens_name'])
         ra = lens_file[:, 1]
         dec = lens_file[:, 2]
 
@@ -153,12 +158,13 @@ class ShearData(object):
 
 
 class WrapX(object):
-
+    # FIXME this loading path is broken!
     def __init__(self, name, lens_path, source_path, xshear_path, h0=100.,
                  omega_m=0.3, healpix_nside=64, nbin=15, rmin=0.02, rmax=30,
-                 zlvals='default', doc=""):
+                 zlvals='default', doc="", base_path='./'):
 
         self.name = name
+        self.base_path = base_path
         self.config_name = self.name + ".cfg"
         self.lens_name = self.name + "_lens.dat"
         self.log_name = self.name + "_log.p"
@@ -211,7 +217,7 @@ class WrapX(object):
         cfile.write(conf)
         cfile.close()
 
-    def write_lens(self,ids="cat_matched", ra="RA", dec="DEC", z="Z",
+    def write_lens(self,ids="cat_matched", ra="RA", dec="DEC", z="Z_LAMBDA",
                    mode="fits"):
         """creates lens data file"""
 
