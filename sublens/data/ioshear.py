@@ -159,7 +159,7 @@ class ShearData(object):
 
 class WrapX(object):
     # FIXME this loading path is broken!
-    def __init__(self, name, lens_path, source_path, xshear_path, h0=100.,
+    def __init__(self, name, lens_path, source_path, xshear_path, h0=70.,
                  omega_m=0.3, healpix_nside=64, nbin=15, rmin=0.02, rmax=30,
                  zlvals='default', doc="", base_path='./'):
 
