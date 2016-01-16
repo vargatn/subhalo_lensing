@@ -8,92 +8,35 @@ import scipy.integrate as integr
 import pickle
 
 
+# class SecHalo:
+
 class SecHalo:
 
-    def __init__(self, pscont, cosmo=None):
+    def __init__(self, pscont, w2log, cosmo=None):
         """
         Creates object for 2-halo term
-        :param z: redshift
-        # :param pspectra: PowerSpectrum object
         """
         # default cosmology
         if cosmo is None:
-            cosmo =  default_cosmo()
+            cosmo = default_cosmo()
         self.cosmo = cosmo
 
         # power spectrum container
-        self.psc = pscont
+        self.pscont = pscont
+        self.w2log = w2log
 
-    def ds(self, rarr, mass, z):
-        """
-        \Delta\Sigma values at the specified r values
-
-        :param rr: list of r values
-        :param z: redshift
-        :return: ds_arr
-        """
-        print(rarr, mass, z)
-
-        # obtain power spectra_func
-        ps = self.psc.getspec(z)
-
-        # get matter bias
+    def ds(self, m, z, mode='nearest'):
+        """Delta sigma profile of 2-halo term"""
+        ps = self.pscont.getspec(z, mode=mode)
         mb = MatterBias(ps)
-        bias = mb.bias(mass, z)
-        print(bias)
+        bias = mb.bias(m, z)
 
-        # get integral of the Power spectrum
-        pnb = self._dsigma_nb(rarr, z, ps.specfunc)
+        if mode=='nearest':
+            ind = np.argmin((self.w2log['zarr'] - z)**2.)
+        else:
+            raise NotImplementedError
 
-        return pnb[0], pnb[1] * bias
-
-    @staticmethod
-    def _lfunc(l, theta, pfunc, kfactor):
-        """The inside of the Hankel transformation"""
-        val = l / (2. * np.pi) * scipy.special.jv(2, l * theta) *\
-              pfunc(l / kfactor)
-        return val
-
-    def larr(self, ll, rr, mass, z):
-        """evaluates the _lfunc on a grid of values"""
-        ps = self.psc.getspec(z)
-        da = self.cosmo.angular_diameter_distance(z).to(u.Mpc)
-        theta = rr / da.value
-        kfactor = ((1. + z) * da.value)
-        print(kfactor)
-        vals = np.array([self._lfunc(l, theta, ps.specfunc, kfactor) for l in ll])
-
-        return  vals
-
-    @staticmethod
-    def _sumfunc(func, args, lmin=0, lmax=1.5e5, dl=1):
-        val = 0.0
-        l = 0
-        for l in np.arange(lmin, lmax, dl):
-            val += func(l, *args)
-        return val
-
-    def _dsigma_nb(self, rarr, z, sfunc, **kwargs):
-        """
-        2-halo DSigma WITHOUT BIAS
-
-        :param rarr: r-values [Mpc]
-        :param z: redshift
-        """
-
-        # Angular size distance
-        da = self.cosmo.angular_diameter_distance(z).to(u.Mpc)
-        thetarr = rarr / da.value
-        # print(thetarr)
-        # to convert l to k
-        kfactor = ((1. + z) * da.value)
-
-        # linear matter power spectrum at required redshift
-        prefactor = (self.cosmo.critical_density0 * self.cosmo.Om0 / da**2.).value
-
-        sumarr = np.array([self._sumfunc(self._lfunc, (theta, sfunc, kfactor),
-                                         **kwargs) for theta in thetarr])
-        return rarr, sumarr / 1e12
+        return self.w2log['rarr'], self.w2log['restab'][ind, :] * bias
 
 
 class W2calc(object):
@@ -146,6 +89,15 @@ class W2calc(object):
         self.restab = restab
         return self.restab
 
+    def getlog(self, tag=""):
+        log_dict = {
+            "restab": self.restab,
+            "zarr": self.zarr,
+            "rarr": self.rarr,
+            "tag": tag,
+        }
+        return log_dict
+
     def write(self, sname, tag=""):
         """saves the calculated thetatable"""
 
@@ -170,7 +122,7 @@ class MatterBias(object):
         if cosmo is None:
             cosmo =  default_cosmo()
         self.cosmo = cosmo
-
+        self.h = self.cosmo.H0.value / 100.
         self.cdens0 = self.cosmo.critical_density0.to(u.solMass / u.Mpc**3)
 
         # power spectrum container
@@ -184,7 +136,7 @@ class MatterBias(object):
 
     def bias(self, mass, z, delta=200):
         """linear matter bias based on halo mass and redshift"""
-        nu = self.nu(mass, z)
+        nu = self.nu(mass / self.h, z)
         b = self.fbias(nu, delta=delta)
         return b
 
