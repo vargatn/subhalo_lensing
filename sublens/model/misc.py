@@ -7,7 +7,7 @@ import math
 
 def default_cosmo():
     cosmo0 = {
-        'H0': 100,
+        'H0': 70,
         'Om0': 0.3
     }
     return FlatLambdaCDM(**cosmo0)

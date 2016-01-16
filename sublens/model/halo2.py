@@ -1,59 +1,257 @@
-# TODO implement here the direct summation calculation
 
 import scipy
 import astropy.units as u
 from ..model.misc import default_cosmo
 import numpy as np
 import scipy.interpolate as interp
+import scipy.integrate as integr
+import pickle
 
-class PowerSpec:
-    def __init__(self, prefix, suffix, zvals, loc='./', scalar_ind=0.96):
+
+class SecHalo:
+
+    def __init__(self, pscont, cosmo=None):
         """
-        Loads linear matter power speclist from CAMB output
-
-        :param prefix:
-        :param suffix:
-        :param zvals:
-        :param loc:
+        Creates object for 2-halo term
+        :param z: redshift
+        # :param pspectra: PowerSpectrum object
         """
-        self.scalar_ind = scalar_ind
-        self.zvals = np.array(zvals)
-        self.fnames = [prefix + "{:.1f}.".format(zval) + suffix
-                       for zval in zvals]
+        # default cosmology
+        if cosmo is None:
+            cosmo =  default_cosmo()
+        self.cosmo = cosmo
 
-        self.speclist = [np.loadtxt(name) for name in self.fnames]
+        # power spectrum container
+        self.psc = pscont
 
-    def _make_interpolator(self):
-        pass
-        # interp.interp1d()
-
-
-    def _interpolate(self, z):
+    def ds(self, rarr, mass, z):
         """
-        Interpolates power spectrum to the specified redshift
+        \Delta\Sigma values at the specified r values
 
-        ONLY INTERPOLATES DATA points
-
-        Raises error if z is outside the redshift range
-
-        :return: power spectrum at specified redshift
+        :param rr: list of r values
+        :param z: redshift
+        :return: ds_arr
         """
-        pass
+        print(rarr, mass, z)
 
-    def spec(self, z, nearest=True):
-        if nearest:
-            specind = np.argmin((z - self.zvals)**2.)
-            spectra = self.speclist[specind]
-        else:
-            raise NotImplementedError
+        # obtain power spectra_func
+        ps = self.psc.getspec(z)
 
-        karr = spectra[:, 0]
-        parr = spectra[:, 1]
+        # get matter bias
+        mb = MatterBias(ps)
+        bias = mb.bias(mass, z)
+        print(bias)
 
+        # get integral of the Power spectrum
+        pnb = self._dsigma_nb(rarr, z, ps.specfunc)
+
+        return pnb[0], pnb[1] * bias
+
+    @staticmethod
+    def _lfunc(l, theta, pfunc, kfactor):
+        """The inside of the Hankel transformation"""
+        val = l / (2. * np.pi) * scipy.special.jv(2, l * theta) *\
+              pfunc(l / kfactor)
+        return val
+
+    def larr(self, ll, rr, mass, z):
+        """evaluates the _lfunc on a grid of values"""
+        ps = self.psc.getspec(z)
+        da = self.cosmo.angular_diameter_distance(z).to(u.Mpc)
+        theta = rr / da.value
+        kfactor = ((1. + z) * da.value)
+        print(kfactor)
+        vals = np.array([self._lfunc(l, theta, ps.specfunc, kfactor) for l in ll])
+
+        return  vals
+
+    @staticmethod
+    def _sumfunc(func, args, lmin=0, lmax=1.5e5, dl=1):
+        val = 0.0
+        l = 0
+        for l in np.arange(lmin, lmax, dl):
+            val += func(l, *args)
+        return val
+
+    def _dsigma_nb(self, rarr, z, sfunc, **kwargs):
+        """
+        2-halo DSigma WITHOUT BIAS
+
+        :param rarr: r-values [Mpc]
+        :param z: redshift
+        """
+
+        # Angular size distance
+        da = self.cosmo.angular_diameter_distance(z).to(u.Mpc)
+        thetarr = rarr / da.value
+        # print(thetarr)
+        # to convert l to k
+        kfactor = ((1. + z) * da.value)
+
+        # linear matter power spectrum at required redshift
+        prefactor = (self.cosmo.critical_density0 * self.cosmo.Om0 / da**2.).value
+
+        sumarr = np.array([self._sumfunc(self._lfunc, (theta, sfunc, kfactor),
+                                         **kwargs) for theta in thetarr])
+        return rarr, sumarr / 1e12
+
+
+class W2calc(object):
+    def __init__(self, rarr, zarr, pcont, cosmo=None):
+        """
+        2-halo term without the bias
+
+        Calculates the W_2 integral and the corresponding prefactors
+        """
+        if cosmo is None:
+            cosmo = default_cosmo()
+        self.cosmo = cosmo
+        self.rarr = rarr
+        self.zarr = zarr
+        self.pcont = pcont
+
+        self.darr = np.array([self.cosmo.angular_diameter_distance(z).value
+                              for z in zarr])
+        self.thetatab = np.array([[r/da for r in self.rarr]
+                                  for da in self.darr]) # radian
+
+        self.restab = None
+
+    @staticmethod
+    def _warg(l, theta, pfunc, z, da):
+        val = l / (2. * np.pi) * scipy.special.jv(2, l * theta) * pfunc(l / ((1 + z) * da))
+        return val
+
+    def calc(self, sname=None):
+        """
+        creates the actual data table (tested only z = 0.1 - 1.0)
+        """
+        restab = np.ones(shape=self.thetatab.shape) * -1.
+
+        cdens0 = self.cosmo.critical_density0.to(u.solMass / u.Mpc**3.)
+        Om0 = self.cosmo.Om0
+
+        for i, row in enumerate(self.thetatab):
+            z = self.zarr[i]
+            ps = self.pcont.getspec(z)
+            da = self.darr[i]
+            for j, th in enumerate(row):
+                restab[i, j] = integr.romberg(self._warg, 0,
+                                              10**(2.5 - np.log10(th)),
+                                              args=(th, ps.specfunc, z, da))
+            prefac = cdens0 * Om0 / da**2
+            restab[i, :] *= prefac
+            restab[i, :] /= 1e12
+
+        self.restab = restab
+        return self.restab
+
+    def write(self, sname, tag=""):
+        """saves the calculated thetatable"""
+
+        log_dict = {
+            "restab": self.restab,
+            "zarr": self.zarr,
+            "rarr": self.rarr,
+            "tag": tag,
+        }
+        pickle.dump(log_dict, open(sname, 'wb'))
+
+    @staticmethod
+    def read(oname):
+        log_dict = pickle.load(open(oname, 'rb'))
+        return log_dict
+
+
+class MatterBias(object):
+    def __init__(self, ps, cosmo=None):
+        self.dc = 1.686
+
+        if cosmo is None:
+            cosmo =  default_cosmo()
+        self.cosmo = cosmo
+
+        self.cdens0 = self.cosmo.critical_density0.to(u.solMass / u.Mpc**3)
+
+        # power spectrum container
+        self.ps = ps
+
+    def nu(self, mass, z):
+        """peak heiht"""
+        rval = self.rbias(mass, z)
+        nn = self.dc / self.ps.sigma(rval)
+        return nn
+
+    def bias(self, mass, z, delta=200):
+        """linear matter bias based on halo mass and redshift"""
+        nu = self.nu(mass, z)
+        b = self.fbias(nu, delta=delta)
+        return b
+
+    def rbias(self, mass, z):
+        """Lagrangian scale of the halo"""
+        m = mass * u.solMass
+        cdens = self.cosmo.critical_density(z).to(u.solMass / u.Mpc**3)
+        rlag = ((3. * m) / (4. * np.pi * cdens * self.cosmo.Om(z))) ** (1. / 3.)
+        return rlag.value
+
+    def fbias(self, nu, delta=200.):
+        """Calculates bias as a function of nu"""
+        y = np.log10(delta)
+
+        A = 1. + 0.24 * y * np.exp(-1. * ( 4. / y) ** 4.)
+        a = 0.44 * y - 0.88
+        B = 0.183
+        b = 1.5
+        C = 0.019 + 0.107 * y + 0.19 * np.exp(-1. * (4. / y) ** 4.)
+        c = 2.4
+
+        valarr = 1. - A * nu**a / (nu**a + self.dc**a) + B * nu**b + C * nu**c
+        return valarr
+
+
+class PowerSpec(object):
+    def __init__(self, karr, parr, z, descr="", scalar_ind=0.96, h=0.7, s8=0.79):
+        """
+        Creates power spectrum
+
+        :param karr: k values
+        :param parr: power spectrum value
+        :param z: redshift of the power spec
+        """
+        self.karr = karr
+        self.parr = parr
+        self.z = z
+        self.scalar_ind= scalar_ind
+        self.h = h
+
+        self.specfunc = self._specmaker(self.karr, self.parr)
+        # self.specfunc = self._s8corr(s8) # this has the desired sigma at 8 Mpc/
+
+    def spec(self, kvals):
+        """evaluates power spectrum at kvals"""
+        kk = np.array(kvals)
+        pp = np.array([self.specfunc(k) for k in kk])
+        return pp
+
+    # def _s8corr(self, s8=0.79):
+    #     """rescales the power spectrum to the desired sigma8 at 8 Mpc/h"""
+    #
+    #     specfunc0 = self._specmaker(self.karr, self.parr)
+    #
+    #     s80 = self._sigma(8. / self.h, specfunc0)
+    #
+    #     fscale = (s8 / s80) ** 2.
+    #
+    #     return self._specmaker(self.karr, self.parr * fscale)
+
+    def _specmaker(self, karr, parr):
+        """inter and extrapolates a CAMB output power spectrum"""
         pkfunc = interp.interp1d(karr, parr)
         lower_norm = (pkfunc(karr[1]) / karr[1]**0.96)
-        upper_norm = pkfunc(karr[-2]) / (karr[-2]**(self.scalar_ind - 4)
-                                         * np.log(karr[-2])**2)
+        upper_norm = pkfunc(karr[-2]) /\
+                     (karr[-2]**(self.scalar_ind - 4) *
+                      np.log(karr[-2])**2)
 
         def ufunclike(kval):
             if (kval > karr[-2]):
@@ -66,141 +264,133 @@ class PowerSpec:
 
         return ufunclike
 
-class SecHalo:
-    def __init__(self, pspectra):
-        """
-
-        :param z: redshift
-        :param pspectra: PowerSpectrum object
-        """
-        # default cosmology
-        self.cosmo = default_cosmo()
-        self.cdens0 = self.cosmo.critical_density0.to(u.solMass / u.Mpc**3)
-
-        # power spectrum container
-        self.pspectra = pspectra
-
     @staticmethod
-    def _lfunc(l, theta, pfunc, kfactor):
-        """The inside of the Hankel transformation"""
-        val = l / (2. * np.pi) * scipy.special.jv(2, l * theta) *\
-              pfunc(l / kfactor)
-        return val
-
-    def dsigma_nb(self, z, edges, **kwargs):
-        """
-        2-halo DSigma WITHOUT BIAS
-
-        :param z: redshift
-        :param theta: angular separation from main halo n radian
-        :return:
-        """
-        cens = np.array([(edges[i + 1] ** 3. - edges[i] ** 3.) * 2. / 3. /
-                             (edges[i + 1] ** 2. - edges[i] ** 2.)
-                             for i, edge in enumerate(edges[:-1])])
-        # Angular size distance
-        da = self.cosmo.angular_diameter_distance(z).to(u.Mpc)
-        thetarr = cens / da.value
-
-        print(thetarr)
-        # to convert l to k
-        kfactor = ((1. + z) * da.value)
-
-        # linear matter power spectrum at required redshift
-        pfunc = self.pspectra.spec(z)
-
-        prefactor = (self.cdens0 * self.cosmo.Om0 / da**2.).value
-
-        sumarr = np.array([self._sumfunc(self._lfunc, (theta, pfunc, kfactor),
-                                         **kwargs) for theta in thetarr])
-        return cens, sumarr * prefactor / 1e12
-
-    @staticmethod
-    def _sumfunc(func, args, lmin=0, lmax=1.5e5, dl=1):
-        val = 0.0
-        l = 0
-        for l in np.arange(lmin, lmax, dl):
-            val += func(l, *args)
-        return val
-
-
-class MatterBias:
-    def __init__(self, pspectra):
-        self.cosmo = default_cosmo()
-        self.cdens0 = self.cosmo.critical_density0.to(u.solMass / u.Mpc**3)
-
-        # self.cosmo.
-        # power spectrum container
-        self.pspectra = pspectra
-
-    @staticmethod
-    def bbks(k):
-        h = 0.7
-        ob = 0.02156 /h /h
-        oc = 0.12544 /h /h
-        om = ob + oc
-        ns = 0.96
-        q = k / (om * h * np.exp(-1. * ob * (1. + np.sqrt(2. * h) / om)))
-        tk = np.log(1. + 2.34 * q) / (2.34 * q) * (1. + 3.89 * q + (16.1 * q)**2. +
-                                                   (5.46 * q)**3. + (6.71 * q)**4.)\
-                                                  **(-1. / 4.)
-        return tk**2. * k**ns
-
-
-    def shat(self, k):
-        R = 8.
-        wk8 = 3. / k**3. / R**3. * (-1. * k * R * np.cos(k * R) + np.sin(k * R))
-        pk = self.bbks(k)
-
-        return k**2. / (2. * scipy.pi**2.) * pk * wk8**2.
-
-    def ref_sigma8(self):
-        self.refs8 = 0.79
-
-
-
-
-
-
-
-
-    def sigma8(self):
-        """Consistency check"""
-        z = 0.0
-        pfunc = self.pspectra.spec(z)
-
-        rr = 8.0
-
-        def shat(k):
-            return k**2. / (2. * scipy.pi**2.) * pfunc(k) * self.sph_tophat(k, rr)
-
-        intres = scipy.integrate.quad(shat, 0.0, np.inf)
-
-        return intres
-
-
-    @staticmethod
-    def sph_tophat(k, rr):
-        wkr = 3. / k**3. / rr**3. *\
-              (-1. * k * rr * np.cos(k * rr) + np.sin(k * rr))
+    def sph_tophat(kr):
+        """Fourier transform of the tophat function"""
+        wkr = 3. / kr ** 3. * (-1. * kr * np.cos(kr) + np.sin(kr))
         return wkr
 
-    def sigma(self, rr, z):
-        pfunc = self.pspectra.spec(z)
-
-        intres = scipy.integrate.quad(self._ifunc, 0.0, np.inf, args=(rr, pfunc))
-        print(intres)
-        sigm = np.sqrt(intres[0]) / (2. * scipy.pi**2.)
-        print(sigm)
-
-
-    def _ifuncarr(self, karr, rr, z):
-        pfunc = self.pspectra.spec(z)
-        valarr = np.array([self._ifunc(k, rr, pfunc) for k in karr])
-        return valarr
-
-    def _ifunc(self, k, rr, pfunc):
-        val = k**2. * pfunc(k) * self.sph_tophat(k, rr)**2.
+    def _sigmarg(self, k, rr, func):
+        """argument of the sigma^2 integral"""
+        val = 1. / (2. * np.pi ** 2.) * func(k) * k ** 2. *\
+              self.sph_tophat(k * rr) ** 2.
         return val
+
+    def _sigma(self, rr, func, kmin=1e-8, kmax=1e3):
+        """Amplitude of fluctuations on the scale of rr [Mpc]"""
+        sigma2 = integr.quad(self._sigmarg, kmin, kmax,
+                             args=(rr, func))
+        return np.sqrt(sigma2)[0]
+
+    def sigma(self, rr, kmin=1e-8, kmax=1e3):
+        """Amplitude of fluctuations on the scale of rr [Mpc]"""
+        sigma2 = integr.quad(self._sigmarg, kmin, kmax,
+                             args=(rr, self.specfunc))
+        return np.sqrt(sigma2)[0]
+
+
+class PowerSpecContainer(object):
+    def __init__(self, prefix, suffix, zvals, loc='./', scalar_ind=0.96):
+        """
+        Loads linear matter power spec lists from CAMB output
+
+        :param prefix:
+        :param suffix:
+        :param zvals:
+        :param loc:
+        """
+
+        self.scalar_ind = scalar_ind
+        self.zvals = np.array(zvals)
+
+        assert np.min(self.zvals**2.) < 1e-5, 'z=0 must be included'
+
+        self.fnames = [prefix + "{:.1f}.".format(zval) + suffix
+                       for zval in zvals]
+
+        self.speclist = [np.loadtxt(name) for name in self.fnames]
+
+    def getspec0(self):
+        specind = np.argmin((0.0 - self.zvals)**2.)
+        spectra = self.speclist[specind]
+        return spectra
+
+    def getspec(self, z, mode='nearest', h=0.7, s8=0.79):
+        if mode == "nearest":
+            specind = np.argmin((z - self.zvals)**2.)
+            spectra = self.speclist[specind]
+        else:
+            raise NotImplementedError
+
+        spectra0 = self.getspec0()
+        ps0 = PowerSpec(spectra0[:, 0], spectra0[:, 1], 0.0)
+        s80 = ps0.sigma(8. / h)
+        fscale = (s8 / s80) ** 2.
+
+        return PowerSpec(spectra[:, 0], spectra[:, 1] * fscale, z)
+
+
+# class PowerSpec2:
+#     def __init__(self, prefix, suffix, zvals, loc='./', scalar_ind=0.96):
+#         """
+#         DEPRECATED
+#         Loads linear matter power speclist from CAMB output
+#
+#         :param prefix:
+#         :param suffix:
+#         :param zvals:
+#         :param loc:
+#         """
+#         self.scalar_ind = scalar_ind
+#         self.zvals = np.array(zvals)
+#         self.fnames = [prefix + "{:.1f}.".format(zval) + suffix
+#                        for zval in zvals]
+#
+#         self.speclist = [np.loadtxt(name) for name in self.fnames]
+#
+#     def _make_interpolator(self):
+#         pass
+#         # interp.interp1d()
+#
+#     def _interpolate(self, z):
+#         """
+#         Interpolates power spectrum to the specified redshift
+#
+#         ONLY INTERPOLATES DATA points
+#
+#         Raises error if z is outside the redshift range
+#
+#         :return: power spectrum at specified redshift
+#         """
+#         pass
+#
+#     def spec(self, z, nearest=True):
+#         if nearest:
+#             specind = np.argmin((z - self.zvals)**2.)
+#             spectra = self.speclist[specind]
+#         else:
+#             raise NotImplementedError
+#
+#         karr = spectra[:, 0]
+#         parr = spectra[:, 1]
+#
+#         pkfunc = interp.interp1d(karr, parr)
+#         lower_norm = (pkfunc(karr[1]) / karr[1]**0.96)
+#         upper_norm = pkfunc(karr[-2]) / (karr[-2]**(self.scalar_ind - 4)
+#                                          * np.log(karr[-2])**2)
+#
+#         def ufunclike(kval):
+#             if (kval > karr[-2]):
+#                 return kval ** (self.scalar_ind - 4) * np.log(kval)**2. \
+#                        * upper_norm
+#             elif (kval < karr[1]):
+#                 return kval ** self.scalar_ind * lower_norm
+#             else:
+#                 return pkfunc(kval)
+#
+#         return ufunclike
+
+
+
 
 
