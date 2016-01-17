@@ -8,10 +8,31 @@ import scipy.integrate as integr
 import pickle
 
 
-# class SecHalo:
-
 class SecHalo:
+    def __init__(self, pscont, cosmo=None):
+        """
+        Creates object for 2-halo term
+        """
+        # default cosmology
+        if cosmo is None:
+            cosmo = default_cosmo()
+        self.cosmo = cosmo
 
+        # power spectrum container
+        self.pscont = pscont
+        self.w2i = W2int(pscont, cosmo=cosmo)
+
+    def ds(self, m, z, rr, mode='nearest'):
+        ps = self.pscont.getspec(z, mode=mode)
+        mb = MatterBias(ps)
+        bias = mb.bias(m, z)
+
+        resarr = self.w2i.getw2(rr, z)
+
+        return rr, resarr[1] * bias
+
+
+class SecHaloOld:
     def __init__(self, pscont, w2log, cosmo=None):
         """
         Creates object for 2-halo term
@@ -37,6 +58,41 @@ class SecHalo:
             raise NotImplementedError
 
         return self.w2log['rarr'], self.w2log['restab'][ind, :] * bias
+
+
+class W2int(object):
+    def __init__(self, pcont, cosmo=None):
+        if cosmo is None:
+            cosmo = default_cosmo()
+        self.cosmo = cosmo
+        self.pcont = pcont
+
+    @staticmethod
+    def _warg(l, theta, pfunc, z, da):
+        val = l / (2. * np.pi) * scipy.special.jv(2, l * theta) * pfunc(l / ((1 + z) * da))
+        return val
+
+    def getw2(self, rarr, z):
+        """Single two halo term"""
+        # cosmological quantities
+        da = self.cosmo.angular_diameter_distance(z).value
+        cdens0 = self.cosmo.critical_density0.to(u.solMass / u.Mpc**3.).value
+        Om0 = self.cosmo.Om0
+
+        # prefactor before the integral
+        prefac = cdens0 * Om0 / da**2
+
+        # power spectrum at redshift z
+        ps = self.pcont.getspec(z)
+
+        thetarr = rarr / da
+        resarr = np.zeros(shape=thetarr.shape)
+
+        for i, th in enumerate(thetarr):
+            resarr[i] = integr.romberg(self._warg, 0, 10**(2.5 - np.log10(th)),
+                                       args=(th, ps.specfunc, z, da))
+        resarr = resarr / 1e12
+        return rarr, resarr * prefac
 
 
 class W2calc(object):
