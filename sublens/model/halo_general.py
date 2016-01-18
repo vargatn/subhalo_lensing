@@ -17,6 +17,68 @@ from ..model.halo2 import SecHaloOld
 from ..model.haloc import Halo
 
 
+class HGen2(object):
+    def __init__(self, pscont, cscale=cscale_duffy, cosmo=None):
+
+        if cosmo is None:
+            cosmo = default_cosmo()
+        self.cosmo = cosmo
+        self.h = self.cosmo.H0.value / 100.
+        self.cscale = cscale
+
+        # primary halo object
+        self.ph = CentHaloNFW(cosmo)
+
+        # secondary halo object
+        self.sh = SecHalo(pscont, cosmo=cosmo)
+
+    def cen_ds(self, m, z, rr):
+        assert z > 0.05, 'Two halo term only works for z > 0'
+
+        rarr, ds2 = self.sh.ds(m, z, rr)
+        rarr, ds1 = self.ph.ds(m, z, rr)
+
+        return rr, ds1 + ds2
+
+    def ocen_ds(self, m, z, edges, dist=0.0):
+
+        def gfun(val):
+            return 0.0
+
+        def hfun(val):
+            return 2. * math.pi
+
+        mids = edges[:-1] + np.diff(edges) / 2.
+        areas = np.array([np.pi * (edges[i + 1] ** 2. - edges[i] ** 2.)
+                          for i, val in enumerate(edges[:-1])])
+
+        sigma_rim = np.zeros(shape=mids.shape)
+        for i, val in enumerate(edges[:-1]):
+            print(i)
+            sigma_rim[i] = integr.dblquad(self._ds2d, edges[i], edges[i+1], gfun, hfun, args=(m, z, dist),  epsabs=1.49e-4)[0]
+
+        return mids, sigma_rim / areas
+
+
+    def _ds2d(self, phi, r, m, z, dist=0.0):
+        assert r > 0.
+        c = self.cscale(m / self.h, z)
+        rs, rho_s, r200 = self.ph.nfw_params(m, c, z)
+        # shear_t = self.ph.nfw_shear_t(r, rs, rho_s) / 1e12 / r
+
+        dist2 = dist * dist
+        rr2 = dist2 + r * (r - 2. * dist * math.cos(phi))
+        rr = math.sqrt(rr2)
+        term1 = (dist2 + r * (2. * r * math.cos(phi) ** 2. - 2. * dist * math.cos(phi) - r)) / rr2
+        term2 = (2. * r * math.sin(phi) * (r * math.cos(phi) - dist)) / rr2
+        #
+        ph_shear_tcent = self.ph.nfw_shear_t(rr, rs, rho_s) / 1e12 / rr * r
+        shear_tcent = ph_shear_tcent
+        shear_t = shear_tcent * (term1 * math.cos(2. * phi) + term2 * math.sin(2. * phi))
+
+        return shear_t
+
+
 class HGen(object):
     def __init__(self, pscont, cscale=cscale_duffy, cosmo=None):
 
@@ -78,8 +140,7 @@ class HGen(object):
         """Integrates in a circle at r"""
 
         # print(r)
-        intres = i
-    ntegr.quad(self._ocen_prof, -math.pi, math.pi,
+        intres = integr.quad(self._ocen_prof, -math.pi, math.pi,
                              args=(r, rs, rho_s, ifunc2, dist))
 
         phmean = intres[0]
