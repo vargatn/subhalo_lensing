@@ -31,6 +31,18 @@ class SecHalo:
 
         return rr, resarr[1] * bias
 
+    def interp_ds(self, m, z, rr, kind="linear", rmult=False):
+        """creates interpolator function for the profile based on rr evals"""
+        rarr, ds = self.ds(m, z, rr)
+
+        if rmult:
+            ds *= rr
+
+        ifunc = interp.interp1d(rarr, ds, kind=kind, fill_value=0.0,
+                                bounds_error=False)
+
+        return ifunc
+
 
 class SecHaloOld:
     def __init__(self, pscont, w2log, cosmo=None):

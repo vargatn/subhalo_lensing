@@ -34,6 +34,14 @@ class CentHaloNFW(object):
 
         return rs.value, rho_s.value, r200.value
 
+    def ds_point(self, m , z, r):
+        c = self.cscale(m / self.h, z)
+        rs, rho_s, r200 = self.nfw_params(m, c, z)
+
+        ds = self.nfw_shear_t(r, rs, rho_s) / r / 1e12
+
+        return r, ds
+
     def ds(self, m, z, rr):
 
         c = self.cscale(m / self.h, z)
@@ -82,21 +90,21 @@ class CentHaloNFW(object):
 
         return shear * r
 
-def nfw_prof_noint(c200, m200, z, edges):
-    rs, rho_s, r200 = nfw_pars(m200, c200, z)
-
-    areas = np.array([np.pi * (edges[i + 1] ** 2. - edges[i] ** 2.)
-                      for i, edge in enumerate(edges[:-1])])
-    cens = np.array([(edges[i + 1] ** 3. - edges[i] ** 3.) * 2. / 3. /
-                     (edges[i + 1] ** 2. - edges[i] ** 2.)
-                     for i, edge in enumerate(edges[:-1])])
-
-    ds = np.array([nfw_shear_t(cen, rs, rho_s) / cen
-                   for i, cen in enumerate(cens)])
-
-    ds = ds / 1e12
-
-    return cens, ds
+# def nfw_prof_noint(c200, m200, z, edges):
+#     rs, rho_s, r200 = nfw_pars(m200, c200, z)
+#
+#     areas = np.array([np.pi * (edges[i + 1] ** 2. - edges[i] ** 2.)
+#                       for i, edge in enumerate(edges[:-1])])
+#     cens = np.array([(edges[i + 1] ** 3. - edges[i] ** 3.) * 2. / 3. /
+#                      (edges[i + 1] ** 2. - edges[i] ** 2.)
+#                      for i, edge in enumerate(edges[:-1])])
+#
+#     ds = np.array([nfw_shear_t(cen, rs, rho_s) / cen
+#                    for i, cen in enumerate(cens)])
+#
+#     ds = ds / 1e12
+#
+#     return cens, ds
 
 
 
