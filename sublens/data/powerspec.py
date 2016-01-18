@@ -1,5 +1,8 @@
 import numpy as np
 import scipy.integrate as integr
+import scipy.interpolate as interp
+
+# TODO clean up this module
 
 class PowerSpecContainer(object):
     def __init__(self, prefix, suffix, zvals, loc='./', scalar_ind=0.96):
