@@ -8,7 +8,7 @@ import scipy.integrate as integr
 
 # FIXME document this module
 
-from ..model.misc import default_cosmo
+from sublens import default_cosmo
 from ..model.autoscale import cscale_duffy
 
 

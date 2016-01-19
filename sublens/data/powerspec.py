@@ -2,10 +2,8 @@ import numpy as np
 import scipy.integrate as integr
 import scipy.interpolate as interp
 
-# TODO clean up this module
-
 class PowerSpecContainer(object):
-    def __init__(self, prefix, suffix, zvals, loc='./', scalar_ind=0.96):
+    def __init__(self, prefix, suffix, zvals, loc='./', scalar_ind=0.96, verbose=False):
         """
         Loads linear matter power spec lists from CAMB output
 
@@ -22,6 +20,9 @@ class PowerSpecContainer(object):
 
         self.fnames = [prefix + "{:.1f}.".format(zval) + suffix
                        for zval in zvals]
+
+        if verbose:
+            print(self.fnames)
 
         self.speclist = [np.loadtxt(name) for name in self.fnames]
 
@@ -44,10 +45,11 @@ class PowerSpecContainer(object):
 
         return PowerSpec(spectra[:, 0], spectra[:, 1] * fscale, z)
 
+
 class PowerSpec(object):
     def __init__(self, karr, parr, z, descr="", scalar_ind=0.96, h=0.7, s8=0.79):
         """
-        Creates power spectrum
+        Creates callable power spectrum at z
 
         :param karr: k values
         :param parr: power spectrum value
@@ -60,24 +62,12 @@ class PowerSpec(object):
         self.h = h
 
         self.specfunc = self._specmaker(self.karr, self.parr)
-        # self.specfunc = self._s8corr(s8) # this has the desired sigma at 8 Mpc/
 
     def spec(self, kvals):
         """evaluates power spectrum at kvals"""
         kk = np.array(kvals)
         pp = np.array([self.specfunc(k) for k in kk])
         return pp
-
-    # def _s8corr(self, s8=0.79):
-    #     """rescales the power spectrum to the desired sigma8 at 8 Mpc/h"""
-    #
-    #     specfunc0 = self._specmaker(self.karr, self.parr)
-    #
-    #     s80 = self._sigma(8. / self.h, specfunc0)
-    #
-    #     fscale = (s8 / s80) ** 2.
-    #
-    #     return self._specmaker(self.karr, self.parr * fscale)
 
     def _specmaker(self, karr, parr):
         """inter and extrapolates a CAMB output power spectrum"""
