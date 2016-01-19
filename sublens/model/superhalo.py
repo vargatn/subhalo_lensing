@@ -35,7 +35,7 @@ class SuperHalo(object):
 
         return rr, ds1 + ds2
 
-    def ocen_ds_disc(self, edges, dist, m, z, interp_grid="default"):
+    def ocen_ds_ring(self, edges, dist, m, z, interp_grid="default"):
         """integrates the ds at a ring between the edges"""
         # getting nfw parameters
         c = self.cscale(m / self.h, z)
@@ -64,19 +64,18 @@ class SuperHalo(object):
         # calculating the integral
         ds_sum = np.zeros(shape=(len(edges)-1, 2))
 
-        # for i, edge in enumerate(edg)
-
-        # dst_sum = np.array([integr.dblquad(self._ds2d, )])
+        for i, edge in enumerate(edges[:-1]):
+            print(i)
+            ds_sum[i] = integr.dblquad(self._ds2d, edges[i], edges[i+1],
+                                       gfun, hfun,
+                                       args=(dist, ifunc, rs, rho_s),
+                                       epsabs=1.49e-4)[0]
         t1 = time.time()
         print(t1 - t0, ' s')
 
+        return ds_sum / areas[:, np.newaxis]
 
-
-
-
-
-
-    def ocen_ds_ring(self, rarr, dist, m, z, interp_grid="default" ):
+    def ocen_ds_circ(self, rarr, dist, m, z, interp_grid="default" ):
         """integrates the ds at a ring at r"""
         # getting nfw parameters
         c = self.cscale(m / self.h, z)
