@@ -36,6 +36,8 @@ class Halo(object):
         self.pnames = None
         self.pars = None
 
+        self.mode = None
+        self.rvals = None
         self.multi_log = None
 
     def write_log(self, sname='./multi_log.p'):
@@ -43,7 +45,9 @@ class Halo(object):
             'comp': self.comp,
             'names': self.pnames,
             'pars': self.pars,
-            'multi_log': self.multi_log
+            'multi_log': self.multi_log,
+            'rvals': self.rvals,
+            'mode': self.mode,
         }
         pickle.dump(ldict, open(sname, 'wb'))
 
@@ -71,6 +75,9 @@ class Halo(object):
 
         # multiprocessing threads
         pool = mp.Pool(processes=n_multi)
+
+        self.mode = mode
+        self.rvals = rvals
 
         if mode == 'circ':
             multi_log = np.array(pool.map(self._ocen_ds_circ_pool, setlist))
@@ -108,8 +115,6 @@ class Halo(object):
 
         ds_sum = np.zeros(shape=(len(rvals)-1, 2))
         for i, edge in enumerate(rvals[:-1]):
-            # pass
-            print(i)
             ds_sum[i] = integr.dblquad(self._ds2d, rvals[i], rvals[i+1],
                                        gfun, hfun,
                                        args=(dist,),
