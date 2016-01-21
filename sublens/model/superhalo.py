@@ -175,7 +175,7 @@ class SuperHalo(object):
 
         return ds_sum / areas[:, np.newaxis]
 
-    def ocen_ds_circ(self, rarr, dist=0.0, m=1e12, z=0.5, interp_grid="default" ):
+    def ocen_ds_circ(self, rarr, dist=0.0, m=1e12, z=0.5, interp_grid="default"):
         """integrates the ds at a ring at r"""
         # getting nfw parameters
         c = self.cscale(m / self.h, z)

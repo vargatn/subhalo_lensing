@@ -37,7 +37,7 @@ class pooler(object):
         # par
 
         # halo.ocen_ds_ring(edges, 1e)
-        # pool = multi.Pool(processes=n_multi)
+        # pool = mp.Pool(processes=n_multi)
 
         setting = (halo, edges, 0.0, pars[0, 0], pars[0, 1])
 

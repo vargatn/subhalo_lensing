@@ -1,8 +1,10 @@
 import time
 import math
 import scipy
+import pickle
 import numpy as np
 import astropy.units as u
+import multiprocessing as mp
 import scipy.interpolate as interp
 import scipy.integrate as integr
 
@@ -10,27 +12,129 @@ from sublens import default_cosmo
 from ..model.autoscale import cscale_duffy
 
 
+def parmaker(**kwargs):
+    # gets names of parameters
+    par_names = sorted(kwargs.keys())
+    # gets edges for parameters
+    edges = [kwargs[key] for key in par_names]
+
+    grid_list = np.meshgrid(*edges, indexing='ij')
+    flatgrid = np.array([grid.flatten() for grid in grid_list]).T
+
+    log_dict = {
+        'names': par_names,
+        'pars': flatgrid,
+    }
+    return log_dict
+
+
 class Halo(object):
-    def __init(self, component):
+    def __init__(self, component):
         self.ncomp = len(component)
         self.comp = component
 
-        self.m = None
-        # self.
+        self.pnames = None
+        self.pars = None
 
-    def cen_ds_curve(self, m, z, rr):
-        pass
+        self.multi_log = None
 
-    def ocen_ds_ring(self):
-        pass
+    def write_log(self, sname='./multi_log.p'):
+        ldict = {
+            'comp': self.comp,
+            'names': self.pnames,
+            'pars': self.pars,
+            'multi_log': self.multi_log
+        }
+        pickle.dump(ldict, open(sname, 'wb'))
 
-    def ocen_ds_circ(self):
-        pass
+    @staticmethod
+    def read_log(lname):
+        ldict = pickle.load(open(lname, 'rb'))
+        # comp = ldict['comp']
+        names = ldict['names']
+        pars = ldict['pars']
+        multi_log = ldict['multi_log']
+        return names, pars, multi_log
+
+    def multi_func(self, rvals, logdict, n_multi=1, mode='circ', **kwargs):
+        self.pnames = logdict['names']
+        self.pars = logdict['pars']
+
+        # creating list of settings
+        npar = len(self.pars)
+        setlist = []
+        for i in range(npar):
+            settings = {'rvals': rvals,}
+            for j, key in enumerate(self.pnames):
+                settings.update({key: self.pars[i, j]})
+            setlist.append(settings)
+
+        # multiprocessing threads
+        pool = mp.Pool(processes=n_multi)
+
+        if mode == 'circ':
+            multi_log = np.array(pool.map(self._ocen_ds_circ_pool, setlist))
+        elif mode == "ring":
+            multi_log = np.array(pool.map(self._ocen_ds_ring_pool, setlist))
+        else:
+            raise NotImplementedError
+
+        self.multi_log = multi_log
+        return self.multi_log
+
+    def cen_ds_curve(self, m, z, rr, *args, **kwargs):
+        # preparing halo components
+        [comp.prep_ds(m=m, z=z, **kwargs) for comp in self.comp]
+        # obtaining individual profiles
+        dsarr = np.sum(np.array([comp.dsarr(m=m, z=z, rr=rr)[1]
+                                 for comp in self.comp]), axis=0)
+        return rr, dsarr
+
+    def _ocen_ds_ring_pool(self, settings):
+        return self.ocen_ds_ring(**settings)
+
+    def ocen_ds_ring(self, rvals, m=1e12, z=0.5, dist=0.0, **kwargs):
+        # area of rings between edges
+        areas = np.array([np.pi * (rvals[i + 1] ** 2. - rvals[i] ** 2.)
+                          for i, val in enumerate(rvals[:-1])])
+        # preparing halo components
+        [comp.prep_ds(m=m, z=z, **kwargs) for comp in self.comp]
+
+        def gfun(val):
+            return 0.
+
+        def hfun(val):
+            return 2 * math.pi
+
+        ds_sum = np.zeros(shape=(len(rvals)-1, 2))
+        for i, edge in enumerate(rvals[:-1]):
+            # pass
+            print(i)
+            ds_sum[i] = integr.dblquad(self._ds2d, rvals[i], rvals[i+1],
+                                       gfun, hfun,
+                                       args=(dist,),
+                                       epsabs=1.49e-4)[0]
+
+        return ds_sum / areas[:, np.newaxis]
+
+    def _ocen_ds_circ_pool(self, settings):
+        return self.ocen_ds_circ(**settings)
+
+    def ocen_ds_circ(self, rvals, m=1e12, z=0.5, dist=0.0, **kwargs):
+        # calculating circumference
+        circarr = 2. * math.pi * rvals
+        # preparing halo components
+        [comp.prep_ds(m=m, z=z, **kwargs) for comp in self.comp]
+
+        # evaluating function
+        dst_sum = np.array([integr.quad(self._ds2d, -math.pi, math.pi,
+                                        args=(r, dist)) for r in rvals])
+        return dst_sum / circarr[:, np.newaxis]
 
     def prep_int(self, m, z, dist=0.0):
         pass
 
-    def _ds2d(self, phi, r, dist, rs, rho_s):
+    def _ds2d(self, phi, r, dist):
         assert r > 0.
         # creating transformation variables
         dist2 = dist * dist
@@ -39,6 +143,10 @@ class Halo(object):
         term1 = (dist2 + r * (2. * r * math.cos(phi) ** 2. - 2. * dist * math.cos(phi) - r)) / rr2
         term2 = (2. * r * math.sin(phi) * (r * math.cos(phi) - dist)) / rr2
 
+        dst_cen = np.sum([comp._ds(rr) * r for comp in self.comp])
+
+        dst = dst_cen * (term1 * math.cos(2. * phi) + term2 * math.sin(2. * phi))
+        return dst
 
 
 class HaloComponent(object):
@@ -49,9 +157,15 @@ class HaloComponent(object):
             cosmo = default_cosmo()
         self.cosmo = cosmo
         # setting up parameters
-        self.ifunc = lambda x: 0.0
+        # self.ifunc = lambda x: 0.0
+
+        # self.ifunc = ifunc
         self.iinit = False
-        
+
+    @staticmethod
+    def ifunc(x):
+        return 0.0
+
     def prep_ds(self, *args, **kwargs):
         self.iinit = True
 
