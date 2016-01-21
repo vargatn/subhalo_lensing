@@ -7,9 +7,109 @@ import scipy.interpolate as interp
 import scipy.integrate as integr
 
 # FIXME document this module
+# TODO make sub and superhalo as a class composition
 
 from sublens import default_cosmo
 from ..model.autoscale import cscale_duffy
+
+class SubHalo(object):
+    def __init__(self, cscale=cscale_duffy, cosmo=None):
+
+        if cosmo is None:
+            cosmo = default_cosmo()
+        self.cosmo = cosmo
+        self.h = self.cosmo.H0.value / 100.
+        self.cscale = cscale
+
+        # primary halo object
+        self.ph = NFW(cosmo)
+
+    def cen_ds_curve(self, m, z, rr, maxcomp=2):
+        assert z > 0.05, 'Two halo term only works for z > 0'
+
+        rarr, ds1 = self.ph.ds(m, z, rr)
+
+        return rr, ds1
+
+    def ocen_ds_ring(self, edges, dist=0.0, m=1e12, z=0.5):
+        """integrates the ds at a ring between the edges"""
+        # getting nfw parameters
+        c = self.cscale(m / self.h, z)
+        rs, rho_s, r200 = self.ph.nfw_params(m, c, z)
+
+        # area of rings between edges
+        areas = np.array([np.pi * (edges[i + 1] ** 2. - edges[i] ** 2.)
+                          for i, val in enumerate(edges[:-1])])
+
+        # boundary functions for the rings
+        def gfun(val):
+            return 0.
+
+        def hfun(val):
+            return 2 * math.pi
+
+        t0 = time.time()
+        # calculating the integral
+        ds_sum = np.zeros(shape=(len(edges)-1, 2))
+
+        for i, edge in enumerate(edges[:-1]):
+            # print(i)
+            ds_sum[i] = integr.dblquad(self._ds2d, edges[i], edges[i+1],
+                                       gfun, hfun,
+                                       args=(dist, rs, rho_s),
+                                       epsabs=1.49e-4)[0]
+        t1 = time.time()
+        # print(t1 - t0, ' s')
+
+        return ds_sum / areas[:, np.newaxis]
+
+    def ocen_ds_circ(self, rarr, dist=0.0, m=1e12, z=0.5):
+        """integrates the ds at a ring at r"""
+        # getting nfw parameters
+        c = self.cscale(m / self.h, z)
+        rs, rho_s, r200 = self.ph.nfw_params(m, c, z)
+
+        # calculating circumference
+        circarr = 2. * math.pi * rarr
+
+        # t0 = time.time()
+        # calculating the integral
+        dst_sum = np.array([integr.quad(self._ds2d, -math.pi, math.pi,
+                                        args=(r, dist, rs, rho_s)) for r in rarr])
+        # t1 = time.time()
+        # print(t1 - t0, ' s')
+
+        return dst_sum / circarr[:, np.newaxis]
+
+    def ocen_ds(self, pararr, dist, m, z):
+        """simple diagnostic function"""
+
+        # getting nfw parameters
+        c = self.cscale(m / self.h, z)
+        rs, rho_s, r200 = self.ph.nfw_params(m, c, z)
+
+        t0 = time.time()
+        dstarr = np.array([self._ds2d(phi, r, dist, rs, rho_s) for (phi, r) in pararr])
+        t1 = time.time()
+        print(t1 - t0, ' s')
+
+        return dstarr
+
+    def _ds2d(self, phi, r, dist, rs, rho_s):
+        assert r > 0.
+        # creating transformation variables
+        dist2 = dist * dist
+        rr2 = dist2 + r * (r - 2. * dist * math.cos(phi))
+        rr = math.sqrt(rr2)
+        term1 = (dist2 + r * (2. * r * math.cos(phi) ** 2. - 2. * dist * math.cos(phi) - r)) / rr2
+        term2 = (2. * r * math.sin(phi) * (r * math.cos(phi) - dist)) / rr2
+
+        # creating centered profile at distance r
+        ds_p = self.ph.nfw_shear_t(rr, rs, rho_s) / 1e12 * r  # 1-halo
+        dst_cen = ds_p
+
+        dst = dst_cen * (term1 * math.cos(2. * phi) + term2 * math.sin(2. * phi))
+        return dst
 
 
 class SuperHalo(object):
@@ -27,15 +127,15 @@ class SuperHalo(object):
         # secondary halo object
         self.sh = TwoHalo(pscont, cosmo=cosmo)
 
-    def cen_ds_curve(self, m, z, rr):
+    def cen_ds_curve(self, m, z, rr, maxcomp=2):
         assert z > 0.05, 'Two halo term only works for z > 0'
 
-        rarr, ds2 = self.sh.ds(m, z, rr)
         rarr, ds1 = self.ph.ds(m, z, rr)
+        rarr, ds2 = self.sh.ds(m, z, rr)
 
         return rr, ds1 + ds2
 
-    def ocen_ds_ring(self, edges, dist, m, z, interp_grid="default"):
+    def ocen_ds_ring(self, edges, dist=0.0, m=1e12, z=0.5, interp_grid="default"):
         """integrates the ds at a ring between the edges"""
         # getting nfw parameters
         c = self.cscale(m / self.h, z)
@@ -65,17 +165,17 @@ class SuperHalo(object):
         ds_sum = np.zeros(shape=(len(edges)-1, 2))
 
         for i, edge in enumerate(edges[:-1]):
-            print(i)
+            # print(i)
             ds_sum[i] = integr.dblquad(self._ds2d, edges[i], edges[i+1],
                                        gfun, hfun,
                                        args=(dist, ifunc, rs, rho_s),
                                        epsabs=1.49e-4)[0]
         t1 = time.time()
-        print(t1 - t0, ' s')
+        # print(t1 - t0, ' s')
 
         return ds_sum / areas[:, np.newaxis]
 
-    def ocen_ds_circ(self, rarr, dist, m, z, interp_grid="default" ):
+    def ocen_ds_circ(self, rarr, dist=0.0, m=1e12, z=0.5, interp_grid="default" ):
         """integrates the ds at a ring at r"""
         # getting nfw parameters
         c = self.cscale(m / self.h, z)
@@ -87,7 +187,7 @@ class SuperHalo(object):
             interp_grid = np.logspace(-3, 2, num=50)
         ifunc = self.sh.interp_ds(m, z, interp_grid)
         t1 = time.time()
-        print(t1 - t0, ' s')
+        # print(t1 - t0, ' s')
 
         # calculating circumference
         circarr = 2. * math.pi * rarr
@@ -97,7 +197,7 @@ class SuperHalo(object):
         dst_sum = np.array([integr.quad(self._ds2d, -math.pi, math.pi,
                                         args=(r, dist, ifunc, rs, rho_s)) for r in rarr])
         t1 = time.time()
-        print(t1 - t0, ' s')
+        # print(t1 - t0, ' s')
 
         return dst_sum / circarr[:, np.newaxis]
 
@@ -114,12 +214,12 @@ class SuperHalo(object):
             interp_grid = np.logspace(-3, 2, num=50)
         ifunc = self.sh.interp_ds(m, z, interp_grid)
         t1 = time.time()
-        print(t1 - t0, ' s')
+        # print(t1 - t0, ' s')
 
         t0 = time.time()
         dstarr = np.array([self._ds2d(phi, r, dist, ifunc, rs, rho_s) for (phi, r) in pararr])
         t1 = time.time()
-        print(t1 - t0, ' s')
+        # print(t1 - t0, ' s')
 
         return dstarr
 
@@ -220,7 +320,7 @@ class NFW(object):
         return shear
 
 
-class TwoHalo:
+class TwoHalo(object):
     def __init__(self, pscont, cosmo=None):
         """
         Creates object for 2-halo term
