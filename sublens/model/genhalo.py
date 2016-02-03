@@ -12,6 +12,12 @@ from sublens import default_cosmo
 from ..model.autoscale import cscale_duffy
 
 
+def hloader(name):
+    hlog = pickle.load(open(name, "rb"))
+    return hlog['names'], hlog['pars'], hlog['rvals'], hlog['profs'], hlog
+    # srvals2 = slog2['rvals']
+
+
 def parmaker(**kwargs):
     # gets names of parameters
     par_names = sorted(kwargs.keys())
@@ -24,6 +30,7 @@ def parmaker(**kwargs):
     log_dict = {
         'names': par_names,
         'pars': flatgrid,
+        'pcens': kwargs,
     }
     return log_dict
 
@@ -35,17 +42,20 @@ class Halo(object):
 
         self.pnames = None
         self.pars = None
+        # lis
+        self.pcens = None
 
         self.mode = None
         self.rvals = None
-        self.multi_log = None
+        self.profs = None
 
-    def write_log(self, sname='./multi_log.p'):
+    def write_log(self, sname='./profs.p'):
         ldict = {
             'comp': self.comp,
             'names': self.pnames,
             'pars': self.pars,
-            'multi_log': self.multi_log,
+            'pcens': self.pcens,
+            'profs': self.profs,
             'rvals': self.rvals,
             'mode': self.mode,
         }
@@ -57,12 +67,13 @@ class Halo(object):
         # comp = ldict['comp']
         names = ldict['names']
         pars = ldict['pars']
-        multi_log = ldict['multi_log']
-        return names, pars, multi_log
+        profs = ldict['profs']
+        return names, pars, profs
 
     def multi_func(self, rvals, logdict, n_multi=1, mode='circ', **kwargs):
         self.pnames = logdict['names']
         self.pars = logdict['pars']
+        self.pcens = logdict['pcens']
 
         # creating list of settings
         npar = len(self.pars)
@@ -80,47 +91,73 @@ class Halo(object):
         self.rvals = rvals
 
         if mode == 'circ':
-            multi_log = np.array(pool.map(self._ocen_ds_circ_pool, setlist))
+            profs = np.array(pool.map(self._ocen_ds_circ_pool, setlist))
         elif mode == "ring":
-            multi_log = np.array(pool.map(self._ocen_ds_ring_pool, setlist))
+            profs = np.array(pool.map(self._ocen_ds_ring_pool, setlist))
         else:
             raise NotImplementedError
 
-        self.multi_log = multi_log
-        return self.multi_log
+        self.profs = profs
+        return self.profs
 
-    def cen_ds_curve(self, m, z, rr, *args, **kwargs):
+    def cen_ds_curve(self, rr, m, z=0.5, *args, **kwargs):
         # preparing halo components
         [comp.prep_ds(m=m, z=z, **kwargs) for comp in self.comp]
         # obtaining individual profiles
         dsarr = np.sum(np.array([comp.dsarr(m=m, z=z, rr=rr)[1]
                                  for comp in self.comp]), axis=0)
-        return rr, dsarr
+        return dsarr
 
     def _ocen_ds_ring_pool(self, settings):
-        return self.ocen_ds_ring(**settings)
+        return self.alter_ring(**settings)
 
-    def ocen_ds_ring(self, rvals, m=1e12, z=0.5, dist=0.0, **kwargs):
-        # area of rings between edges
-        areas = np.array([np.pi * (rvals[i + 1] ** 2. - rvals[i] ** 2.)
-                          for i, val in enumerate(rvals[:-1])])
-        # preparing halo components
+    # def ocen_ds_ring(self, rvals, m=1e12, z=0.5, dist=0.0, **kwargs):
+    #     # area of rings between edges
+    #     areas = np.array([np.pi * (rvals[i + 1] ** 2. - rvals[i] ** 2.)
+    #                       for i, val in enumerate(rvals[:-1])])
+    #     # preparing halo components
+    #     [comp.prep_ds(m=m, z=z, **kwargs) for comp in self.comp]
+    #
+    #     def gfun(val):
+    #         return -1. *math.pi
+    #
+    #     def hfun(val):
+    #         return math.pi
+    #
+    #     ds_sum = np.zeros(shape=(len(rvals)-1, 2))
+    #     for i, edge in enumerate(rvals[:-1]):
+    #         ds_sum[i] = integr.dblquad(self._ds2d, rvals[i], rvals[i+1],
+    #                                    gfun, hfun,
+    #                                    args=(dist, self.comp),
+    #                                    epsabs=1.49e-8, epsrel=1.49e-8)[0]
+    #
+    #     return ds_sum / areas[:, np.newaxis]
+
+    def alter_ring(self, rvals, m=1e12, z=0.5, dist=0.0, **kwargs):
+        # areas = np.array([np.pi * (rvals[i + 1] ** 2. - rvals[i] ** 2.)
+        #                   for i, val in enumerate(rvals[:-1])])
+        # print('pre-prep')
         [comp.prep_ds(m=m, z=z, **kwargs) for comp in self.comp]
 
-        def gfun(val):
-            return 0.
-
-        def hfun(val):
-            return 2 * math.pi
-
+        # print('post-prep')
+        points = None
         ds_sum = np.zeros(shape=(len(rvals)-1, 2))
         for i, edge in enumerate(rvals[:-1]):
-            ds_sum[i] = integr.dblquad(self._ds2d, rvals[i], rvals[i+1],
-                                       gfun, hfun,
-                                       args=(dist,),
-                                       epsabs=1.49e-4)[0]
+            # print(i)
+            # if (dist < rvals[i+1]) * (dist > rvals[i]):
+            #     points = (dist,)
 
-        return ds_sum / areas[:, np.newaxis]
+            # print(points)
+            ds_sum[i] = integr.quad(self._alter_rc, rvals[i], rvals[i+1], args=(dist,), points=points)
+            ds_sum[i] /= (rvals[i+1] - rvals[i])
+
+        return ds_sum
+
+    def _alter_rc(self, r, dist):
+        circ = 2. * math.pi * r
+        # evaluating function
+        dst = integr.quad(self._ds2d, -math.pi, math.pi, args=(r, dist, self.comp), points=(0.0,))
+        return dst[0] / circ
 
     def _ocen_ds_circ_pool(self, settings):
         return self.ocen_ds_circ(**settings)
@@ -133,13 +170,14 @@ class Halo(object):
 
         # evaluating function
         dst_sum = np.array([integr.quad(self._ds2d, -math.pi, math.pi,
-                                        args=(r, dist)) for r in rvals])
+                                        args=(r, dist, self.comp), points=(0.0,)) for r in rvals])
         return dst_sum / circarr[:, np.newaxis]
 
     def prep_int(self, m, z, dist=0.0):
         pass
 
-    def _ds2d(self, phi, r, dist):
+    @staticmethod
+    def _ds2d(phi, r, dist, comps):
         assert r > 0.
         # creating transformation variables
         dist2 = dist * dist
@@ -148,7 +186,7 @@ class Halo(object):
         term1 = (dist2 + r * (2. * r * math.cos(phi) ** 2. - 2. * dist * math.cos(phi) - r)) / rr2
         term2 = (2. * r * math.sin(phi) * (r * math.cos(phi) - dist)) / rr2
 
-        dst_cen = np.sum([comp._ds(rr) * r for comp in self.comp])
+        dst_cen = np.sum([comp._ds(rr) * r for comp in comps])
 
         dst = dst_cen * (term1 * math.cos(2. * phi) + term2 * math.sin(2. * phi))
         return dst
@@ -204,7 +242,7 @@ class NFW(HaloComponent):
     def _ds(self, rr):
         """Intended for point evaluations"""
         assert self.iinit, 'profile not initiated'
-        return self._nfw_shear_t(rr, self.rs, self.rho_s) / 1e12
+        return self._nfw_shear_t(rr, self.rs, self.rho_s)
 
     def dsarr(self, m, z, rr, *args, **kwargs):
         """Evaluates the \Delta\Sigma profile at the specified rr values"""
@@ -291,10 +329,11 @@ class TwoHalo(HaloComponent):
         self.z = z
         self.rr = rr
         self.ds = ds
-
+        print('pre interp')
         # creating interpolation
         ifunc = interp.interp1d(rarr, ds, kind=kind, fill_value=0.0,
                                 bounds_error=False)
+        print('post interp')
         self.ifunc = ifunc
         self.iinit = True
 
