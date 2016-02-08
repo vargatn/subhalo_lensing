@@ -133,24 +133,40 @@ class Halo(object):
     #
     #     return ds_sum / areas[:, np.newaxis]
 
-    def alter_ring(self, rvals, m=1e12, z=0.5, dist=0.0, **kwargs):
-        # areas = np.array([np.pi * (rvals[i + 1] ** 2. - rvals[i] ** 2.)
-        #                   for i, val in enumerate(rvals[:-1])])
-        # print('pre-prep')
+    def alter_ring(self, rvals, m=1e12, z=0.5, dist=0.0, verbose=False, split=True, deps=0.01, **kwargs):
         [comp.prep_ds(m=m, z=z, **kwargs) for comp in self.comp]
 
-        # print('post-prep')
         points = None
         ds_sum = np.zeros(shape=(len(rvals)-1, 2))
-        for i, edge in enumerate(rvals[:-1]):
-            # print(i)
-            # if (dist < rvals[i+1]) * (dist > rvals[i]):
-            #     points = (dist,)
 
-            # print(points)
-            ds_sum[i] = integr.quad(self._alter_rc, rvals[i], rvals[i+1], args=(dist,), points=points)
+        time00 = time.time()
+        for i, edge in enumerate(rvals[:-1]):
+            if verbose:
+                print('ring ',i)
+                print(rvals[i], rvals[i + 1], ' Mpc')
+
+            time0 = time.time()
+            if split * (dist < rvals[i+1]) * (dist > rvals[i]):
+                if verbose:
+                    print('dist = ', dist, ' Mpc')
+                    print('doing the splitting')
+
+                dssum0 = np.array(integr.quad(self._alter_rc, rvals[i], dist, args=(dist,), points=points))
+                dssum1 = np.array(integr.quad(self._alter_rc, dist, rvals[i+1], args=(dist,), points=points))
+                # print(dssum0 + dssum1)
+                ds_sum[i] = dssum0 + dssum1
+            else:
+                ds_sum[i] = integr.quad(self._alter_rc, rvals[i], rvals[i+1], args=(dist,), points=points)
+            # print(ds_sum[i])
             ds_sum[i] /= (rvals[i+1] - rvals[i])
 
+
+            time1 = time.time()
+            if verbose:
+                print(time1 - time0, ' s')
+        time11 = time.time()
+        if verbose:
+            print(time11 - time00, ' s')
         return ds_sum
 
     def _alter_rc(self, r, dist):
@@ -217,7 +233,6 @@ class HaloComponent(object):
 
     def dsarr(self, *args, **kwargs):
         pass
-
 
 class NFW(HaloComponent):
     def __init__(self, cosmo=None, cscale=cscale_duffy):
@@ -305,6 +320,22 @@ class NFW(HaloComponent):
                                 (x ** 2. - 1.) ** (3. / 2.))))
         return shear
 
+
+class NFW_gen(NFW):
+    def prep_ds(self, m, z, **kwargs):
+        self.rs, self.rho_s, self.r200 = self._nfw_params(self.cosmo, m,
+                                                          kwargs['c'], z)
+        self.iinit = True
+
+    def dsarr(self, m, z, rr, *args, **kwargs):
+        """Evaluates the \Delta\Sigma profile at the specified rr values"""
+        rs, rho_s, r200 = self._nfw_params(self.cosmo, m, kwargs['c'], z)
+
+        ds = np.array([self._nfw_shear_t(r, rs, rho_s)
+                       for i, r in enumerate(rr)])
+        ds /= 1e12
+
+        return rr, ds
 
 class TwoHalo(HaloComponent):
     def __init__(self, pscont, cosmo=None):
