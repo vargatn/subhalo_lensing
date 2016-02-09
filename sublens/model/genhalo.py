@@ -100,11 +100,13 @@ class Halo(object):
         self.profs = profs
         return self.profs
 
-    def cen_ds_curve(self, rr, m, z=0.5, *args, **kwargs):
+    def cen_ds_curve(self, rr, m=1e12, z=0.5, mlog=True, *args, **kwargs):
         # preparing halo components
+        if mlog:
+            m = 10 ** m
         [comp.prep_ds(m=m, z=z, **kwargs) for comp in self.comp]
         # obtaining individual profiles
-        dsarr = np.sum(np.array([comp.dsarr(m=m, z=z, rr=rr)[1]
+        dsarr = np.sum(np.array([comp.dsarr(m=m, z=z, rr=rr, **kwargs)[1]
                                  for comp in self.comp]), axis=0)
         return dsarr
 
@@ -248,10 +250,16 @@ class NFW(HaloComponent):
         self.rho_s = None
         self.r200 = None
 
-    def prep_ds(self, m, z, **kwargs):
-        self.c = self.cscale(m / self.h, z)
+    def prep_ds(self, m, z, c=None, **kwargs):
+        # print(c)
+        if c is None:
+            self.c = self.cscale(m / self.h, z)
+        else:
+            self.c = c
+        # print(self.c)
         self.rs, self.rho_s, self.r200 = self._nfw_params(self.cosmo, m,
                                                           self.c, z)
+        # print(self.rs, self.rho_s)
         self.iinit = True
 
     def _ds(self, rr):
@@ -259,9 +267,10 @@ class NFW(HaloComponent):
         assert self.iinit, 'profile not initiated'
         return self._nfw_shear_t(rr, self.rs, self.rho_s)
 
-    def dsarr(self, m, z, rr, *args, **kwargs):
+    def dsarr(self, m, z, rr, c=None, *args, **kwargs):
         """Evaluates the \Delta\Sigma profile at the specified rr values"""
-        c = self.cscale(m / self.h, z)
+        if c is None:
+            c = self.cscale(m / self.h, z)
         rs, rho_s, r200 = self._nfw_params(self.cosmo, m, c, z)
 
         ds = np.array([self._nfw_shear_t(r, rs, rho_s)
