@@ -158,18 +158,30 @@ class ShearData(object):
 
 
 class WrapX(object):
-    # FIXME this loading path is broken!
-    def __init__(self, name, lens_path, source_path, xshear_path, h0=70.,
+    def __init__(self, doc, name, source_path, xshear_path, h0=70.,
                  omega_m=0.3, healpix_nside=64, nbin=15, rmin=0.02, rmax=30,
-                 zlvals='default', doc="", base_path='./'):
+                 zlvals='default', ):
+        """
+        Script wrapper for Erin's xshear
+
+        :param doc: documentation string (detailed)
+        :param name: name (short) of the current setup
+        :param source_path: path of the source catalog
+        :param xshear_path: path of the xshear executable
+        :param h0: Hubble constant base at z=0 (defines h or h_70 etc...)
+        :param omega_m: matter density parameter at z=0
+        :param healpix_nside: number of healpix cells to use along a side
+        :param nbin: number of logarithmic radial bins
+        :param rmin: innermost radial bin edge
+        :param rmax: outermost radial bin edge
+        :param zlvals: used redshift values (array/list)
+        """
 
         self.name = name
-        self.base_path = base_path
         self.config_name = self.name + ".cfg"
         self.lens_name = self.name + "_lens.dat"
         self.log_name = self.name + "_log.p"
         self.res_name = self.name + "_res.dat"
-        self.lens_path = lens_path
         self.source_path = source_path
         self.xshear_path = xshear_path
         self.h0 = h0
@@ -179,7 +191,9 @@ class WrapX(object):
         self.rmin = rmin
         self.rmax = rmax
         self.doc = doc
-        self.lpars = None
+
+        self.lcname = None
+        self.lens_data = None
 
         _default_zlvals = [0., 0.01532258, 0.03064516, 0.04596774, 0.06129032,
                  0.0766129, 0.09193548, 0.10725806, 0.12258065, 0.13790323,
@@ -200,7 +214,16 @@ class WrapX(object):
         else:
             self.zlvals = zlvals
 
-    def config(self):
+    def add_lens(self, ids, ra, dec, z, lcname):
+        """creates lens data file"""
+
+        field_mask_dummy = np.zeros(shape=ids.shape)
+        lens = np.vstack((ids, ra, dec, z,
+                          field_mask_dummy)).T
+        self.lens_data = lens
+        self.lcname = lcname
+
+    def write_config(self, base_path):
         """creates config file"""
         conf = "H0                = {:.2f}\n".format(self.h0) + \
                "omega_m           = {:.2f}\n".format(self.omega_m) + \
@@ -212,47 +235,24 @@ class WrapX(object):
                "rmax              = {:.2f}\n".format(self.rmax) + \
                'sigmacrit_style   = "interp"\n' +\
                "zlvals = " + str(self.zlvals)
-
-        cfile = open(self.base_path + self.config_name, 'w')
+        cfile = open(base_path + self.config_name, 'w')
         cfile.write(conf)
         cfile.close()
 
-    def write_lens(self,ids="cat_matched", ra="RA", dec="DEC", z="Z_LAMBDA",
-                   mode="fits"):
+    def write_lens(self, base_path):
         """creates lens data file"""
-
-        self.lpars = {
-            "ids": ids,
-            "ra": ra,
-            "dec": dec,
-            "z": z,
-        }
-
-        if mode == "fits":
-            ldata = fits.open(self.lens_path)[1].data
-        else:
-            raise NotImplementedError("currently only fits files are supported")
-
-        if ids == "cat_matched":
-            ids = np.arange(len(ldata[ra]))
-
-        field_mask_dummy = np.zeros(shape=ids.shape)
-        lens = np.vstack((ids, ldata[ra], ldata[dec], ldata[z],
-                          field_mask_dummy)).T
-
+        assert self.lens_data is not None
         fmt = ["%d", "%.18f", "%.18f", "%.18f", "%d"]
+        np.savetxt(base_path + self.lens_name, self.lens_data, fmt=fmt)
 
-        np.savetxt(self.base_path + self.lens_name, lens, fmt=fmt)
-
-    def write_log(self):
-
+    def write_log(self, base_path):
+        """Creates log dictionary"""
         log_dict =  {
             "name": self.name,
             "config_name": self.config_name,
             "lens_name": self.lens_name,
             "log_name": self.log_name,
             "res_name": self.res_name,
-            "lens_path": self.lens_path,
             "source_path": self.source_path,
             "xshear_path": self.xshear_path,
             "h0": self.h0,
@@ -262,14 +262,12 @@ class WrapX(object):
             "rmin": self.rmin,
             "rmax": self.rmax,
             "doc": self.doc,
-            "lpars": self.lpars,
+            "lcname": self.lcname,
             "zlvals": self.zlvals,
-
         }
+        pickle.dump(log_dict, open(base_path + self.log_name, "wb"))
 
-        pickle.dump(log_dict, open(self.base_path + self.log_name, "wb"))
-
-    def write_script(self, check=False):
+    def write_script(self, base_path, check=False):
         """executable xshear script"""
 
         script = "#!bin/bash \n"
@@ -281,16 +279,16 @@ class WrapX(object):
         script += self.xshear_path + " " + self.config_name + " " +\
                   self.lens_name + " > " + self.res_name
 
-        sfile = open(self.base_path + self.name + ".sh", "w")
+        sfile = open(base_path + self.name + ".sh", "w")
         sfile.write(script)
         sfile.close()
 
-    def prepall(self):
-        self.config()
-        self.write_lens()
-        self.write_script(check=True)
-        self.write_script()
-        self.write_log()
+    def write_all(self, base_path):
+        self.write_config(base_path)
+        self.write_lens(base_path)
+        self.write_script(base_path)
+        self.write_log(base_path)
+
 
 
 
