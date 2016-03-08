@@ -4,6 +4,7 @@ workspace/*.fit
 workspace/*.fits
 workspace/*.p
 workspace/.ipnyb
+workspace/*/*
 settings.yaml
 build
 dist
