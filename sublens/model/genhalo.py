@@ -275,7 +275,7 @@ class NFW(HaloComponent):
 
         ds = np.array([self._nfw_shear_t(r, rs, rho_s)
                        for i, r in enumerate(rr)])
-        ds /= 1e12
+        ds = (ds / 1e12).astype(float)
 
         return rr, ds
 
