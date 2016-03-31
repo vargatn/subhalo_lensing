@@ -5,116 +5,36 @@ MCMC chain an likelihood
 import numpy as np
 
 
-class Likelihood:
-    def __init__(self, profmaker, modelprof, ind=None):
 
-        # checking if everything is prepared
-        assert profmaker.dst is not None
-        assert profmaker.dsx is not None
-        assert profmaker.dst_cov is not None
-        assert profmaker.dsx_cov is not None
+def llike(hh, rvals, dvec, dcov, mode='cen', range=None, **kwargs):
+    """
+    Evaluates log-likelihood
 
-        # assert modelprof.ref_list is not None
+    Uses centered non-bin-averaged DeltaSigma profile
 
-        self.ind = ind
-        if self.ind is None:
-            self.ind = np.arange(len(profmaker.dst_cov))
+    :param hh: Halo object
+    :param rvals: radius values to use
+    :param dvec: data vector
+    :param dcov: data covariance matrix
+    :param kwargs: arguements passed to
+    :return: chi2 value
+    """
 
-        self.profmaker = profmaker
-        self.modelprof = modelprof
+    if mode == 'cen':
+        model = hh.cen_ds_curve(rvals, **kwargs)
+    else:
+        raise NotImplementedError
 
-        self.dst = profmaker.dst
-        self.dsx = profmaker.dsx
-        self.dst_cov = profmaker.dst_cov
-        self.dsx_cov = profmaker.dsx_cov
+    diff = (dvec - model)
 
-        self.cdett = np.linalg.det(self.dst_cov)
-        self.cdetx = np.linalg.det(self.dsx_cov)
+    if range is None:
+        range = (0., np.inf)
+    index = np.where((range[0] <= rvals) * (range[1] > rvals))
 
-        self.cinvt = np.linalg.inv(self.dst_cov)
-        self.cinvx = np.linalg.inv(self.dsx_cov)
+    cinv = np.linalg.inv(dcov[index, index])
+    chisq = float(np.dot(diff[index].T, np.dot(cinv, diff[index])))
 
-
-    def like(self, pars):
-        """calculates model based on scaling and evaluates chi2"""
-        self.modelprof.scale_frame(pars)
-        self.modelprof.collapse_profiles()
-
-        model = self.modelprof.model
-
-        delta = np.zeros(shape=model.shape)
-        delta[self.ind] = (self.dst - model)[self.ind]
-
-        # print(delta)
-
-        chi2 = 1. / 2. * np.dot(delta.T, np.dot(self.cinvt, delta))
-        # print(chi2)
-        return chi2
-
-
-class MCMC:
-    def __init__(self, like):
-        self.like = like
-
-
-
-    def randomstep(self):
-        ndim = len(self.usind)
-
-        step = np.zeros(shape=self.dpar.shape)
-        cov = np.diag(self.dpar[self.usind])
-
-        step[self.usind] = np.random.multivariate_normal(np.zeros(ndim), cov)
-        return step
-
-
-
-    def run(self, par0, dpar, nstep=100, seed=5):
-        """perform a Metropolis Hastings run"""
-
-        self.nstep = nstep
-        self.seed = seed
-        self.dpar = np.array(dpar)
-
-        # setting seed for rng
-        np.random.seed(seed)
-
-        self.params = np.array([par0])
-        chi2_old = self.like.like(par0)
-
-        self.chi2s = np.array([chi2_old])
-        par_old = par0
-
-        print(self.params.shape)
-        # checking how many dimensions are explored
-
-        self.usind = np.array(np.where(np.isnan(dpar) == 0)[0])
-
-        for i in np.arange(nstep):
-            if i%100 ==0:
-                print(i)
-            step = self.randomstep()
-            new_par = par_old + step
-
-            new_chi2  = self.like.like(new_par)
-
-            ref = np.random.uniform()
-
-            if np.exp(-1. * (new_chi2 - chi2_old)) > ref:
-                par_old = new_par
-                chi2_old = new_chi2
-
-
-
-            self.chi2s = np.concatenate((self.chi2s, [chi2_old]))
-            self.params = np.vstack((self.params, new_par))
-
-        return self.params, self.chi2s
-
-
-
-
-
+    return chisq, model
 
 
 

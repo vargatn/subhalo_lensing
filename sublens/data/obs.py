@@ -698,6 +698,12 @@ class PosProfile(object):
         self.dsx_sub = tmp_dsx_sub
 
 
+
+
+
+
+
+
 def ppcov(pc_list):
 
     dtvec = np.array([pc.dst for pc in pc_list]).flatten()
@@ -736,7 +742,287 @@ def ppcov(pc_list):
 
 
 
+class PosProfileWeights(object):
+    def __init__(self, data, raw_pos, weights, centers, cut_spte=True):
+        self.rwdata = data
+        self.rwpos = raw_pos
+        self.rww = weights
+        self.cent = centers
+        self.ncen = len(centers)
 
+        if cut_spte:
+        # constraining to SPT-E field
+            spind = self._get_spte()
+            self.data = self.rwdata[spind]
+            self.pos = self.rwpos[spind]
+            self.w = self.rww[spind]
+            self.num = len(self.pos)
+        else:
+            self.data = self.rwdata
+            self.pos = self.rwpos
+            self.w = self.rww
+            self.num = len(self.pos)
+
+        print('number of objects: ', len(self.pos))
+
+        # Handling xshear output
+        self.nbin, self.xinfo, self.xdata = self.xhandler(self.data)
+
+        # using km centers to obtain jackknife subpatches
+        self.km = krd.KMeans(self.cent)
+        self.labels = self.km.find_nearest(self.pos[:, 1:3]).astype(int)
+        self.sub_labels = np.unique(self.labels)
+
+        self.subcounts = None
+
+        # indexes of clusters for subsample i
+        self.indexes = [np.where(self.labels != ind)[0]
+                        for ind in self.sub_labels]
+
+        # indexes of clusters not in subsample i
+        self.non_indexes = [np.where(self.labels == ind)[0]
+                            for ind in self.sub_labels]
+
+        # radial bin centers are initialized to -1, to signify missing data
+        self.rr = np.ones(self.nbin) * -1.0
+        self.dst0 = np.zeros(self.nbin)
+        self.dst = np.zeros(self.nbin)
+
+        self.dsx0 = np.zeros(self.nbin)
+        self.dsx = np.zeros(self.nbin)
+
+        self.dst_sub = np.zeros(shape=(self.nbin, self.ncen))
+        self.dst_cov = np.zeros((self.nbin, self.nbin))
+        self.dst_err = np.zeros(self.nbin)
+
+        self.dsx_sub = np.zeros(shape=(self.nbin, self.ncen))
+        self.dsx_cov = np.zeros((self.nbin, self.nbin))
+        self.dsx_err = np.zeros(self.nbin)
+
+    def _get_spte(self):
+        spte = np.where(self.rwpos[:, 1] > 60.0)[0]
+        return spte
+
+    def prof_maker(self):
+        self._prof_prep()
+        self._prof_calc()
+
+    def _prof_prep(self):
+
+        # checking bins with zero counts
+        self.nzind = np.where(np.sum(self.xdata[0, :, :], axis=0) > 0)[0]
+
+        # calculating radial values for data points
+        self.rr[self.nzind] = np.sum(self.xdata[1, :, self.nzind], axis=1) /\
+                  np.sum(self.xdata[2, :, self.nzind], axis=1)
+
+        # calculating combined profiles
+        dsum_jack = np.sum(self.xdata[3, :, self.nzind] * self.w, axis=1) / np.sum(self.w)
+        dsensum_jack = np.sum(self.xdata[5, :, self.nzind] * self.w, axis=1) / np.sum(self.w)
+        self.dst0[self.nzind] = dsum_jack / dsensum_jack
+
+        osum_jack = np.sum(self.xdata[4, :, self.nzind] * self.w, axis=1) / np.sum(self.w)
+        osensum_jack = np.sum(self.xdata[6, :, self.nzind] * self.w, axis=1) / np.sum(self.w)
+        self.dsx0[self.nzind] = osum_jack / osensum_jack
+
+        # does the p-th subpatch has counts for radial bin r?
+        self.subcounts = np.array([np.sum(self.xdata[0, ind, :], axis=0)
+                                   for ind in self.indexes])
+        hasval = [np.nonzero(arr.astype(bool))[0] for arr in self.subcounts]
+
+        # calculating jackknife subprofiles
+        for i, lab in enumerate(self.sub_labels):
+            ind = self.indexes[i]
+
+            cind = hasval[i]
+
+            dsum_jack = np.sum(self.xdata[3, ind][:, cind] * self.w[ind, np.newaxis], axis=0) / np.sum(self.w[ind])
+            dsensum_jack = np.sum(self.xdata[5, ind][:, cind] * self.w[ind, np.newaxis], axis=0) / np.sum(self.w[ind])
+            self.dst_sub[cind, lab] = dsum_jack / dsensum_jack
+
+            osum_jack = np.sum(self.xdata[4, ind][:, cind] * self.w[ind, np.newaxis], axis=0) / np.sum(self.w[ind])
+            osensum_jack = np.sum(self.xdata[6, ind][:, cind] * self.w[ind, np.newaxis], axis=0) / np.sum(self.w[ind])
+            self.dsx_sub[cind, lab] = osum_jack / osensum_jack
+
+    def _prof_calc(self):
+        # calculating the JK estimate on the mean profile
+        for r in range(self.nbin):
+            # checking for radial bins with 0 pair count (to avoid NaNs)
+            #subind = self.sub_labels[np.nonzero(self.subcounts[:, r])[0]]
+            subind = self.sub_labels[np.where(self.subcounts[:, r] > 0)[0]]
+
+            if np.max(self.subcounts[:, r]) == 1:
+                self.rr[r] = -1
+
+            njk = len(subind)
+            if njk > 1:
+                self.dst[r] = np.sum(self.dst_sub[r, subind]) / njk
+                self.dsx[r] = np.sum(self.dsx_sub[r, subind]) / njk
+            else:
+                self.rr[r] = -1.
+
+
+        # calculating the covariance
+        for r1 in range(self.nbin):
+            for r2 in range(self.nbin):
+                # subind1 = self.sub_labels[np.nonzero(self.subcounts[:, r1])[0]]
+                subind1 = self.sub_labels[np.where(self.subcounts[:, r1] > 0)[0]]
+                # njk1 = len(subind1)
+                subind2 = self.sub_labels[np.where(self.subcounts[:, r2] > 0)[0]]
+                # njk2 = len(subind2)
+                subind = list(set(subind1).intersection(set(subind2)))
+                njk = len(subind)
+
+                if njk > 1:
+                    self.dst_cov[r1, r2] = np.sum((self.dst_sub[r1, subind] -
+                                                   self.dst[r1]) *
+                                                  (self.dst_sub[r2, subind] -
+                                                   self.dst[r2])) *\
+                                           (njk - 1.0) / njk
+
+                    self.dsx_cov[r1, r2] = np.sum((self.dsx_sub[r1, subind] -
+                                                   self.dsx[r1]) *
+                                                  (self.dsx_sub[r2, subind] -
+                                                   self.dsx[r2])) *\
+                                           (njk - 1.0) / njk
+                elif r1 == r2:
+                    self.rr[r1] = -1
+        self.dst_err = np.sqrt(np.diag(self.dst_cov))
+        self.dsx_err = np.sqrt(np.diag(self.dsx_cov))
+
+    def test_err(self):
+             # testing the error
+        err = np.zeros(self.nbin)
+
+        # print(self.subcounts)
+
+        for r in range(self.nbin):
+            print("r==", r)
+            subind = self.sub_labels[np.where(self.subcounts[:, r].astype(int) > 1)[0]]
+
+            # if r == :
+            # print(self.dst_sub[r, subind])
+
+            njk = len(subind)
+            print(njk)
+            if njk > 1:
+                # print(np.sum((self.dst_sub[r, subind] - self.dst[r])**2.))
+                # print((njk - 1.0) / njk)
+                # print(np.sum((self.dst_sub[r, subind] - self.dst[r])**2.) * (njk - 1.0) / njk)
+                err[r] = np.sum((self.dst_sub[r, subind] - self.dst[r])**2.) * (njk - 1.0) / njk
+
+
+        return np.sqrt(err)
+
+    @staticmethod
+    def xhandler(data):
+        """
+        "info": ("index", "weight_tot", "totpairs"),
+        "data": ("npair_i", "rsum_i", "wsum_i", "dsum_i", "osum_i", "dsensum_i", "osensum_i"),
+        """
+        bins = (data.shape[1] - 3) // 7
+
+        # position indexes
+        sid = 3
+        pos_npair = 0
+        pos_rsum = 1
+        pos_wsum = 2
+        pos_dsum = 3
+        pos_osum = 4
+        pos_dsensum = 5
+        pos_osensum = 6
+
+        gid = data[:, 0]
+        weight_tot = data[:, 1]
+        tot_pairs = data[:, 2]
+        npair = data[:, sid + pos_npair * bins: sid + (pos_npair + 1) * bins]
+        rsum = data[:, sid + pos_rsum * bins: sid + (pos_rsum + 1) * bins]
+        wsum = data[:, sid + pos_wsum * bins: sid + (pos_wsum + 1) * bins]
+        dsum = data[:, sid + pos_dsum * bins: sid + (pos_dsum + 1) * bins]
+        osum = data[:, sid + pos_osum * bins: sid + (pos_osum + 1) * bins]
+        dsensum = data[:,
+                  sid + pos_dsensum * bins: sid + (pos_dsensum + 1) * bins]
+        osensum = data[:,
+                  sid + pos_osensum * bins: sid + (pos_osensum + 1) * bins]
+
+        info = np.vstack((gid, weight_tot, tot_pairs)).T
+        data = np.dstack((npair, rsum, wsum, dsum, osum, dsensum, osensum))
+        data = np.transpose(data, axes=(2, 0, 1))
+
+        # checking if loading made sense
+        assert (info[:, 2] == np.sum(data[0, :, :], axis=1)).all()
+
+        return bins, info, data
+
+    def subtract2(self, other):
+        self.dst = np.zeros(self.nbin)
+
+        self.dst_cov = np.zeros((self.nbin, self.nbin))
+        self.dst_err = np.zeros(self.nbin)
+        self.dsx_cov = np.zeros((self.nbin, self.nbin))
+        self.dsx_err = np.zeros(self.nbin)
+
+        tmp_dst_sub = np.zeros(shape=(self.nbin, self.ncen))
+        tmp_dsx_sub = np.zeros(shape=(self.nbin, self.ncen))
+
+        tmp_sub_labels = np.array(list(set(self.sub_labels).intersection(set(other.sub_labels))))
+        tmp_subcounts = np.zeros((len(tmp_sub_labels), self.nbin))
+        # print(self.subcounts)
+        for i in range(len(tmp_sub_labels)):
+            ind = tmp_sub_labels[i]
+            ind1 = np.where(self.sub_labels == ind)[0][0]
+            ind2 = np.where(other.sub_labels == ind)[0][0]
+            for j in range(self.nbin):
+                tmp_subcounts[i, j] = np.min((self.subcounts[ind1, j], other.subcounts[ind2, j]))
+
+        for r in range(self.nbin):
+            subind = tmp_sub_labels[np.where(tmp_subcounts[:, r] > 0)[0]]
+            if np.max(tmp_subcounts[:, r]) == 1:
+                self.rr[r] = -1
+
+            njk = len(subind)
+            if njk > 1:
+                tmp_dst_sub[r, subind] = self.dst_sub[r, subind] - other.dst_sub[r, subind]
+                tmp_dsx_sub[r, subind] = self.dsx_sub[r, subind] - other.dsx_sub[r, subind]
+
+        for r in range(self.nbin):
+            # checking for radial bins with 0 pair count (to avoid NaNs)
+            subind_a = self.sub_labels[np.where(self.subcounts[:, r] > 0)[0]]
+            subind_b = other.sub_labels[np.where(other.subcounts[:, r] > 0)[0]]
+            subind = list(set(subind_a).intersection(set(subind_b)))
+            njk = len(subind)
+            if njk > 1:
+                self.dst[r] = np.sum((self.dst_sub[r, subind] - other.dst_sub[r, subind])) / njk
+                self.dsx[r] = np.sum((self.dsx_sub[r, subind] - other.dsx_sub[r, subind])) / njk
+            else:
+                self.rr[r] = -1.
+
+        # calculating the covariance
+        for r1 in range(self.nbin):
+            for r2 in range(self.nbin):
+                subind1a = self.sub_labels[np.where(self.subcounts[:, r1] > 0)[0]]
+                subind1b = other.sub_labels[np.where(other.subcounts[:, r1] > 0)[0]]
+                subind1 = list(set(subind1a).intersection(set(subind1b)))
+
+                subind2a = self.sub_labels[np.where(self.subcounts[:, r2] > 0)[0]]
+                subind2b = other.sub_labels[np.where(other.subcounts[:, r2] > 0)[0]]
+                subind2 = list(set(subind2a).intersection(set(subind2b)))
+
+                subind =  list(set(subind1).intersection(set(subind2)))
+                njk = len(subind)
+                # print(njk)
+                if njk > 1:
+                    self.dst_cov[r1, r2] = np.sum(((self.dst_sub[r1, subind] - other.dst_sub[r1, subind]) - self.dst[r1]) * ((self.dst_sub[r2, subind] - other.dst_sub[r2, subind]) - self.dst[r2])) * (njk - 1.0) / njk
+                    self.dsx_cov[r1, r2] = np.sum(((self.dsx_sub[r1, subind] - other.dsx_sub[r1, subind]) - self.dsx[r1]) * ((self.dsx_sub[r2, subind] - other.dsx_sub[r2, subind]) - self.dsx[r2])) * (njk - 1.0) / njk
+                elif r1 == r2:
+                    self.rr[r1] = -1
+        self.dst_err = np.sqrt(np.diag(self.dst_cov))
+        self.dsx_err = np.sqrt(np.diag(self.dsx_cov))
+
+        self.sub_labels = tmp_sub_labels
+        self.subcounts = tmp_subcounts
+        self.dst_sub = tmp_dst_sub
+        self.dsx_sub = tmp_dsx_sub
 
 
 

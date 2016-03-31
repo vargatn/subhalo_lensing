@@ -21,8 +21,8 @@ def gcdist(pa, pb, mode='simple', deg=True):
 
 def _sphere_dist(pa, pb):
     """Simple great circle dist in RADIANS"""
-    dl = np.abs(pa[0] - pb[0])
-    dsigm = np.arccos(np.sin(pa[1]) * np.sin(pb[1]) + np.cos(pa[1]) * np.cos(pb[1]) * np.cos(dl))
+    dl = np.abs(pa[:, 0] - pb[:, 0])
+    dsigm = np.arccos(np.sin(pa[:, 1]) * np.sin(pb[:, 1]) + np.cos(pa[:, 1]) * np.cos(pb[:, 1]) * np.cos(dl))
     return dsigm
 
 

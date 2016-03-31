@@ -179,7 +179,7 @@ def conf2d(pval, xxg, yyg, vals, res=200, etol=1e-3, **kwargs):
     return tcut, pvals[tind]
 
 
-def llike(hh, rvals, dvec, dcov, **kwargs):
+def llike(hh, rvals, dvec, dcov, scalemax=None, **kwargs):
     """
     Evaluates log-likelihood
 
@@ -192,14 +192,25 @@ def llike(hh, rvals, dvec, dcov, **kwargs):
     :param kwargs: arguements passed to
     :return: chi2 value
     """
-    cinv = np.linalg.inv(dcov)
 
     model = hh.cen_ds_curve(rvals, **kwargs)
 
     diff = (dvec - model)
-    chisq = float(np.dot(diff.T, np.dot(cinv, diff)))
 
-    return chisq
+    if scalemax is None:
+        cinv = np.linalg.inv(dcov)
+        chisq = float(np.dot(diff.T, np.dot(cinv, diff)))
+    else:
+        # print(scalemax)
+        # print(rvals[5])
+        imax = np.argmin((rvals - scalemax)**2.)
+        # print(imax)
+        # print(rvals[imax])
+
+        cinv = np.linalg.inv(dcov[:imax, :imax])
+        chisq = float(np.dot(diff[:imax].T, np.dot(cinv, diff[:imax])))
+
+    return chisq, model
 
 
 def llike0(dvec, dcov, **kwargs):
@@ -215,7 +226,7 @@ def llike0(dvec, dcov, **kwargs):
     diff = (dvec - model)
     chisq = float(np.dot(diff.T, np.dot(cinv, diff)))
 
-    return chisq
+    return chisq, model
 
 
 def llike_joint(hh, rvals, dvec, dcov, ppint, **kwargs):
@@ -288,6 +299,7 @@ def mymc(like, settings, nstep=10, seed=None, verbose='True', rng=None, **kwargs
     tmpdict.update(settings)
     tmpdict.update(settings['par0'])
 
+
     # calculating chi2
     chi, dsvec0 = like(**(tmpdict))
     chivec =  np.array([chi])
@@ -299,7 +311,7 @@ def mymc(like, settings, nstep=10, seed=None, verbose='True', rng=None, **kwargs
 
     # going through the steps
     for i in np.arange(nstep):
-        if i%1000 == 0:
+        if i%2000 == 0:
             print(i)
         ds = dsvec[-1]
         par = parvec[-1]
