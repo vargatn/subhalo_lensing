@@ -5,7 +5,6 @@ MCMC chain an likelihood
 import numpy as np
 
 
-
 def llike(hh, rvals, dvec, dcov, mode='cen', range=None, **kwargs):
     """
     Evaluates log-likelihood

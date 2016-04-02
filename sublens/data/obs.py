@@ -6,6 +6,7 @@ import pickle
 import numpy as np
 import kmeans_radec as krd
 
+# FIXME Rationalize these functions for a common format
 
 class ObsSpace(object):
     """

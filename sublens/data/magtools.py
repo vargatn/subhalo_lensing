@@ -11,6 +11,7 @@ import scipy.interpolate as interp
 from astropy import units as u
 from sublens import default_cosmo
 
+# FIXME This entire package needs to be validated with reference data
 
 def apply_kcorr(robs, zarr, kcorr_table, kind="linear"):
     """

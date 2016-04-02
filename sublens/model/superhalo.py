@@ -6,9 +6,6 @@ import astropy.units as u
 import scipy.interpolate as interp
 import scipy.integrate as integr
 
-# FIXME document this module
-# TODO make sub and superhalo as a class composition
-
 from sublens import default_cosmo
 from ..model.autoscale import cscale_duffy
 
