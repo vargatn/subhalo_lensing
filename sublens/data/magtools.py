@@ -2,6 +2,7 @@
 Absolute magnitudes and K-correction
 """
 
+import pickle
 import astropy.cosmology
 import copy
 import numpy as np
@@ -28,12 +29,15 @@ class AbsMagConverter(object):
         # survey parameters
         self.survey = None
         self.rlamb = None
+        self.rlamb_u = None
         self.bands = None
 
         # template parameters
         self.type = None
         self.tlamb = None
+        self.tlamb_u = None
         self.sed = None
+        self.sed_u = None
 
         # kcorrection parameters
         self.kind = None
@@ -47,12 +51,31 @@ class AbsMagConverter(object):
         # reference table variables
         self.dtab = None
 
+    @classmethod
+    def from_table(cls, table):
+        """Loads class using a pre-calculated table for each band"""
+        cosmo = astropy.cosmology.FlatLambdaCDM(**table['cosmo pars'])
+        amag = cls(cosmo)
+        amag.add_response(table['response'])
+        amag.add_template(table['template'])
+        amag.dtab = table
+        return amag
+
+    @classmethod
+    def from_template(cls, template, response, cosmo="default"):
+        """Loads class using a particular template and response"""
+        amag = cls(cosmo)
+        amag.add_response(response)
+        amag.add_template(template)
+        return amag
+
     def add_response(self, rdict):
         """Loads response curves for different bands"""
         assert isinstance(rdict, dict)
         tmp = copy.copy(rdict)
         self.survey = tmp.pop('survey')
         self.rlamb = tmp.pop('lambda')
+        self.rlamb_u = tmp.pop('lambda unit')
         self.bands = tmp
 
     def add_template(self, tdict, norm=True):
@@ -61,9 +84,12 @@ class AbsMagConverter(object):
         tmp = copy.copy(tdict)
         self.type = tmp['type']
         self.tlamb = tmp['lambda']
+        self.tlamb_u = tmp['lambda unit']
         self.sed = tmp['sed']
+        self.sed_u = tmp['sed unit']
         if norm:
             self.sed /= np.max(self.sed)
+            self.sed_u = "normalized by max"
 
     def dist_modulus(self, z):
         """Calculates distance modulus for redshift z"""
@@ -190,40 +216,89 @@ class AbsMagConverter(object):
         :param z: redsift of objects
         :param band: name of band (string)
         :param z2: redshift of observed
+        :param use_tables: Try to use pre calculated table for the band
+
+
+        # for auto z array
         :param num: number of points in reference tables
         :param z_0: start of redshift table
         :param z_1: end of redshift table
+
         :return: absolute magnitudes
         """
-        # calculating lookup redshifts
-        zarr = self._calc_zarr(z, z_0, z_1, num)
 
-        # building conversion table
-        self._conv_table(zarr, band, z2)
-        self._get_ifunc()
+        if use_tables and z2 == self.dtab['z2']:
+            assert self.dtab is not None
+            self.ctab = self.dtab[band]
+        else:
+            # calculating lookup redshifts
+            zarr = self._calc_zarr(z, z_0, z_1, num)
+            # building conversion table
+            self._conv_table(zarr, band, z2)
 
         # querryiong the conversion table
+        self._get_ifunc()
         korr = self._querry(z)
 
         return mag - korr
 
-    def build_tables(self, zarr, z2, **kwargs):
-        # loop throught all bands available and build a table for each
-        # then assemble this to a dict with other relevant info
+    def build_tables(self, zarr, z2=0.0, **kwargs):
+        """
+        Creates a reference table for all the bands
 
-        dtab = {}
+        Loop throught all bands available and build a table for each
+        then assemble this to a dict with other relevant info
 
+        :param zarr: z values to use
+        :param z2: observer redshift
+        """
 
-        pass
+        # reconstructing response dictionary
+        respdict = {
+            'survey': self.survey,
+            'lambda': self.rlamb,
+            'lambda unit': self.rlamb_u,
+        }
+        respdict.update(self.bands)
+
+        # reconstructing template dictionary
+        tempdict = {
+            'type': self.type,
+            'lambda': self.tlamb,
+            'lambda unit': self.tlamb_u,
+            'sed': self.sed,
+            'sed unit': self.sed_u
+        }
+
+        assert isinstance(self.cosmo, astropy.cosmology.FlatLambdaCDM)
+        cosmo_pars = {
+            'H0': self.cosmo.H0,
+            'Om0': self.cosmo.Om0,
+            'Tcmb0': self.cosmo.Tcmb0,
+            'Neff': self.cosmo.Neff,
+            'm_nu': self.cosmo.m_nu,
+            'Ob0': self.cosmo.Ob0,
+        }
+
+        colnames = ['z', 'dmod+kcorr', 'dmod', 'kcorr']
+        tabdict = {
+            'response': respdict,
+            'template': tempdict,
+            'colnames': colnames,
+            'cosmo pars': cosmo_pars,
+            'z2': z2,
+        }
+
+        # building up the correction table for each band
+        bands = list(self.bands.keys())
+        for band in bands:
+            print(band)
+            self._conv_table(zarr, band, z2=z2)
+            tabdict.update({band: copy.deepcopy(self.ctab)})
+
+        self.dtab = tabdict
 
     def save_tables(self, tname):
-        # saves table dict to pickle
-        pass
-
-    def add_tables(self, table):
-        # addds tables to self
-        # this should initiate all relevant variables
-
-        # basically redo init plus other things
-        pass
+        """ saves table dict to pickle"""
+        pickle.dump(copy.deepcopy(self.dtab), open(tname, 'wb'))
 
