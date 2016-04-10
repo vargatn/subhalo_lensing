@@ -13,6 +13,7 @@ from sublens import default_cosmo
 
 # FIXME This entire package needs to be validated with reference data
 
+
 def apply_kcorr(robs, zarr, kcorr_table, kind="linear"):
     """
     Applies k-correction to apparent magnitudes for z0=0.0 frame
