@@ -1,8 +1,20 @@
+"""
+Spherical transformations and 3D rotations
+"""
+
 import numpy as np
 
 
 def gcdist(pa, pb, mode='simple', deg=True):
-    """Great circle distance"""
+    """
+    Great circle distance
+
+    :param pa: coordinates N x (RA, DEC)
+    :param pb: coordinates N x (RA, DEC)
+    :param mode: calculatinon formula (may affect precision)
+    :param deg: True: degrees, false: radians
+    :return: array of distances
+    """
 
     if deg:
         pa = np.array(pa, copy=True, dtype='float64') * np.pi / 180.
@@ -93,3 +105,6 @@ def rot_center(rd, cent, angle=180., deg=True):
     res_rot = np.array(np.dot(Rot, np.matrix(cart))).transpose((1, 0)).T
     new_rd = cart2spher(res_rot[:, 0])
     return new_rd
+
+
+
