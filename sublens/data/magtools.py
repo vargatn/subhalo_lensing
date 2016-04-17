@@ -127,6 +127,8 @@ class AbsMagConverter(object):
         """Calculates k-correction for redshift z"""
         assert self.ftemp is not None
         assert self.fresp is not None
+        err_msg = "template and response units incompatible!, check units..."
+        assert self.tlamb_u == self.rlamb_u, err_msg
         oint, oerr = self._windowint(z1, self.x1, self.x2)
         eint, eerr = self._windowint(0.0, self.x1, self.x2, z2=z2)
         kval = -2.5 * np.log10(oint / eint / (1. + z1))
@@ -227,7 +229,7 @@ class AbsMagConverter(object):
         :return: absolute magnitudes
         """
 
-        if use_tables and z2 == self.dtab['z2']:
+        if use_tables and np.abs(z2 - self.dtab['z2']) < 1e-3:
             assert self.dtab is not None
             self.ctab = self.dtab[band]
         else:

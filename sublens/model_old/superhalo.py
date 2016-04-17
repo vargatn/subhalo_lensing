@@ -6,8 +6,8 @@ import astropy.units as u
 import scipy.interpolate as interp
 import scipy.integrate as integr
 
-from sublens import default_cosmo
-from ..model.autoscale import cscale_duffy
+from ..model_old import default_cosmo
+from ..model_old.autoscale import cscale_duffy
 
 class SubHalo(object):
     def __init__(self, cscale=cscale_duffy, cosmo=None):

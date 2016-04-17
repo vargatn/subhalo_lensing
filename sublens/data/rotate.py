@@ -106,5 +106,3 @@ def rot_center(rd, cent, angle=180., deg=True):
     new_rd = cart2spher(res_rot[:, 0])
     return new_rd
 
-
-

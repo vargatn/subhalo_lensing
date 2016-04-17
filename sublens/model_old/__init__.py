@@ -1,10 +1,14 @@
+"""
+Calculates shear profile model
 
+
+Contents:
+---------
+
+TBA
+"""
 
 from astropy.cosmology import FlatLambdaCDM
-
-# from ..model import profiles
-# from ..model import astroconvert
-# from ..model import pyprojector
 
 
 def default_cosmo():

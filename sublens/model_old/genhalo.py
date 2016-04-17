@@ -8,8 +8,8 @@ import multiprocessing as mp
 import scipy.interpolate as interp
 import scipy.integrate as integr
 
-from sublens import default_cosmo
-from ..model.autoscale import cscale_duffy
+from ..model_old import default_cosmo
+from ..model_old.autoscale import cscale_duffy
 
 
 def hloader(name):
@@ -235,6 +235,7 @@ class HaloComponent(object):
 
     def dsarr(self, *args, **kwargs):
         pass
+
 
 class NFW(HaloComponent):
     def __init__(self, cosmo=None, cscale=cscale_duffy):
