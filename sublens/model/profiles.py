@@ -1,32 +1,32 @@
 """
 Interface for DeltaSigma profiles
+
+The idea is that here I just import the actual implementations, so that there
+is a layer between what happens numerically and how it is interfaced with.
 """
 
-# import pyximport; pyximport.install()
 import numpy as np
 
 from ..model import default_cosmo
 from ..model.astroconvert import nfw_params
 
-from ..model.cycalc import ds_tnfw
-from ..model.cycalc import ds_tnfw_ring
-# from ..model.pycalc import fds_tnfw
+from ..model.cycalc import tnfw
+from ..model.cycalc import tnfw_ring
 
 from ..model.pycalc import nfw_deltasigma
-from ..model.pycalc import ds_nfw_ring
+from ..model.pycalc.full_nfw import nfw_ring
 
-from ..model.pycalc import ds_oc_nfw
-from ..model.pycalc import ds_oc_nfw_ring
+from ..model.pycalc.full_nfw import oc_nfw
+from ..model.pycalc.full_nfw import oc_nfw_ring
 
-from ..model.pycalc.full_nfw import direct_ring_nfw
-from ..model.pycalc.full_nfw import direct_circ_nfw
-from ..model.pycalc.full_nfw import direct_ring_oc_nfw
-from ..model.pycalc.full_nfw import indirect_ring_oc_nfw
-
-# TODO write documentation
 
 class DeltaSigmaProfile(object):
+    """Base class for lensing shear profiles"""
     def __init__(self, cosmo=None):
+        """
+        This abstract class should be used to subclass particular scenarios
+        :param cosmo: cosmology object
+        """
         if cosmo is None:
             cosmo = default_cosmo()
         self.cosmo = cosmo
@@ -43,12 +43,15 @@ class DeltaSigmaProfile(object):
         self._prepared = False
 
     def prepare(self, **kwargs):
+        """Prepares the profile calculations"""
         raise NotImplementedError
 
     def point_ds(self, r, *args, **kwargs):
+        """Evaluates the angle averaged DeltaSigma at a single radial value"""
         raise NotImplementedError
 
     def deltasigma(self, rr, *args, **kwargs):
+        """Creates a DeltaSigma profile by calling self.point_ds"""
         assert self._prepared
 
         if np.iterable(rr):
@@ -61,9 +64,11 @@ class DeltaSigmaProfile(object):
         self.ds = ds
 
     def single_rbin_ds(self, r0, r1, *args, **kwargs):
+        """Evaluates the ring averaged DeltaSigma for a single ring"""
         raise NotImplementedError
 
     def rbin_deltasigma(self, redges, *args, **kwargs):
+        """Evaluates the ring averaged DeltaSigma based on a set of edges"""
         assert np.iterable(redges)
         res = np.array([self.single_rbin_ds(redges[i], redges[i + 1])
                         for i, val in enumerate(redges[:-1])])
@@ -77,6 +82,7 @@ class DeltaSigmaProfile(object):
 
 
 class SimpleNFWProfile(DeltaSigmaProfile):
+    """The conventional spherical NFW profile"""
     def __init__(self, cosmo=None):
         super().__init__(cosmo=cosmo)
         self.requires = sorted(['c200c', 'm200c', 'z'])
@@ -91,18 +97,11 @@ class SimpleNFWProfile(DeltaSigmaProfile):
         return nfw_deltasigma(r, **self.pardict)
 
     def single_rbin_ds(self, r0, r1, *args, **kwargs):
-        return ds_nfw_ring(r0, r1, **self.pardict)
-
-
-class DirectRingCeck(SimpleNFWProfile):
-    def point_ds(self, r, *args, **kwargs):
-        return direct_circ_nfw(r, **self.pardict)
-
-    def single_rbin_ds(self, r0, r1, *args, **kwargs):
-        return direct_ring_nfw(r0, r1, **self.pardict)
+        return nfw_ring(r0, r1, **self.pardict)
 
 
 class TruncatedNFWProfile(DeltaSigmaProfile):
+    """The NFW profile with a hard cutoff at rt"""
     def __init__(self, cosmo=None):
         super().__init__(cosmo=cosmo)
         self.requires = sorted(['c200c', 'm200c', 'z', 'rt'])
@@ -116,14 +115,14 @@ class TruncatedNFWProfile(DeltaSigmaProfile):
         self._prepared = True
 
     def point_ds(self, r, *args, **kwargs):
-        x = r / self.profpars[0]  # r / rs
-        return ds_tnfw(x, **self.pardict)
+        return tnfw(r, **self.pardict)
 
     def single_rbin_ds(self, r0, r1, *args, **kwargs):
-        return ds_tnfw_ring(r0, r1, **self.pardict)
+        return tnfw_ring(r0, r1, **self.pardict)
 
 
 class OffsetNFWProfile(DeltaSigmaProfile):
+    """The NFW profile offset by dist"""
     def __init__(self, cosmo=None):
         super().__init__(cosmo=cosmo)
         self.requires = sorted(['c200c', 'm200c', 'z', 'dist'])
@@ -137,20 +136,9 @@ class OffsetNFWProfile(DeltaSigmaProfile):
         self._prepared = True
 
     def point_ds(self, r, *args, **kwargs):
-        return ds_oc_nfw(r, **self.pardict)
+        return oc_nfw(r, **self.pardict)
 
     def single_rbin_ds(self, r0, r1, *args, **kwargs):
-        return ds_oc_nfw_ring(r0, r1, **self.pardict)
-
-
-class DirectOffsetCheck(OffsetNFWProfile):
-    def single_rbin_ds(self, r0, r1, *args, **kwargs):
-        return indirect_ring_oc_nfw(r0, r1, **self.pardict)
-
-
-
-
-
-
+        return oc_nfw_ring(r0, r1, **self.pardict)
 
 

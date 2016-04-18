@@ -30,11 +30,6 @@ def _f2dint(x, rs=1.0, rhos=1.0, rt=np.inf, **kwargs):
     return 2. * np.array(intres) * rs
 
 
-def f2dint(xx, rs=1.0, rhos=1.0, rt=np.inf, **kwargs):
-    """2D density from 3D density"""
-    return np.array([_f2dint(x, rs, rhos, rt, **kwargs) for x in xx])
-
-
 def areafunc(x, rs=1.0, rhos=1.0, rt=np.inf, **kwargs):
     """Multiplies by polar Jacobian"""
     return _f2dint(x, rs, rhos, rt, **kwargs)[0] * x
@@ -46,30 +41,29 @@ def _f2dint_mean(x, rs=1.0, rhos=1.0, rt=np.inf, **kwargs):
     return 2. / (x*x) * np.array(intres)
 
 
-def f2dint_mean(xx, rs=1.0, rhos=1.0, rt=np.inf, **kwargs):
-    """Mean surface density within a ring of radius x"""
-    return np.array([_f2dint_mean(x, rs, rhos, rt) for x in xx])
-
-
-def tnfw(xx, rs=1.0, rhos=1.0, rt=np.inf, **kwargs):
+def tnfw(r, rs, rho_s, rt=np.inf):
     """
     Delta Sigma of truncated NFW profile at a single value
     """
-    return _f2dint_mean(xx, rs, rhos, rt) - _f2dint(xx, rs, rhos, rt)
+    x = r / rs
+    return _f2dint_mean(x, rs, rho_s, rt)[0] - _f2dint(x, rs, rho_s, rt)[0]
+
+
+def _tnfw_ring(r, rs, rho_s, rt=np.inf, *args, **kwargs):
+    """Calculates the angle-integrated DeltaSigma at polar radius r"""
+    return tnfw(r, rs, rho_s, rt) * 2. * math.pi * r
 
 
 def tnfw_ring(r0, r1, rs, rho_s, rt=np.inf, split=True):
     """
     Ring averaged truncated NFW profile
     """
-    x0 = r0 / rs
-    x1 = r1 / rs
-    xt = rt / rs
     dsum = 0.0
     if split * (r0 < rt <=r1):
-        dsum0 = quad(tnfw, x0, xt, args=(rs, rho_s, rt))[0]
-        dsum1 = quad(tnfw, xt, x1, args=(rs, rho_s, rt))[0]
+        dsum0 = quad(_tnfw_ring, r0, rt, args=(rs, rho_s, rt), epsrel=1e-3)[0]
+        dsum1 = quad(_tnfw_ring, rt, r1, args=(rs, rho_s, rt), epsrel=1e-3)[0]
         dsum = dsum0 + dsum1
     else:
-        dsum = quad(tnfw, x0, x1, args=(rs, rho_s, rt))[0]
-    return dsum / (r1 - r0)
+        dsum = quad(_tnfw_ring, r0, r1, args=(rs, rho_s, rt), epsrel=1e-3)[0]
+    aring = math.pi * (r1**2. - r0 **2.)
+    return dsum / aring
