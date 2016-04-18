@@ -51,8 +51,25 @@ def f2dint_mean(xx, rs=1.0, rhos=1.0, rt=np.inf, **kwargs):
     return np.array([_f2dint_mean(x, rs, rhos, rt) for x in xx])
 
 
-def ds_tnfw(xx, rs=1.0, rhos=1.0, rt=np.inf, **kwargs):
+def tnfw(xx, rs=1.0, rhos=1.0, rt=np.inf, **kwargs):
     """
     Delta Sigma of truncated NFW profile at a single value
     """
     return _f2dint_mean(xx, rs, rhos, rt) - _f2dint(xx, rs, rhos, rt)
+
+
+def tnfw_ring(r0, r1, rs, rho_s, rt=np.inf, split=True):
+    """
+    Ring averaged truncated NFW profile
+    """
+    x0 = r0 / rs
+    x1 = r1 / rs
+    xt = rt / rs
+    dsum = 0.0
+    if split * (r0 < rt <=r1):
+        dsum0 = quad(tnfw, x0, xt, args=(rs, rho_s, rt))[0]
+        dsum1 = quad(tnfw, xt, x1, args=(rs, rho_s, rt))[0]
+        dsum = dsum0 + dsum1
+    else:
+        dsum = quad(tnfw, x0, x1, args=(rs, rho_s, rt))[0]
+    return dsum / (r1 - r0)
