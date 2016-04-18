@@ -18,6 +18,11 @@ from ..model.pycalc import ds_nfw_ring
 from ..model.pycalc import ds_oc_nfw
 from ..model.pycalc import ds_oc_nfw_ring
 
+from ..model.pycalc.full_nfw import direct_ring_nfw
+from ..model.pycalc.full_nfw import direct_circ_nfw
+from ..model.pycalc.full_nfw import direct_ring_oc_nfw
+from ..model.pycalc.full_nfw import indirect_ring_oc_nfw
+
 # TODO write documentation
 
 class DeltaSigmaProfile(object):
@@ -58,11 +63,15 @@ class DeltaSigmaProfile(object):
     def single_rbin_ds(self, r0, r1, *args, **kwargs):
         raise NotImplementedError
 
-    def rbin_deltasigma(self, redges, mids=None, *args, **kwargs):
+    def rbin_deltasigma(self, redges, *args, **kwargs):
         assert np.iterable(redges)
         res = np.array([self.single_rbin_ds(redges[i], redges[i + 1])
                         for i, val in enumerate(redges[:-1])])
-        self.rr = mids
+
+        # this is assuming a constant source surface density
+        self.rr = np.array([(redges[i + 1] ** 3. - redges[i] ** 3.) /
+                            (redges[i + 1] ** 2. - redges[i] ** 2.)
+                            for i, val in enumerate(redges[:-1])])  * 2. / 3.
         self.redges = redges
         self.ds = res
 
@@ -83,6 +92,14 @@ class SimpleNFWProfile(DeltaSigmaProfile):
 
     def single_rbin_ds(self, r0, r1, *args, **kwargs):
         return ds_nfw_ring(r0, r1, **self.pardict)
+
+
+class DirectRingCeck(SimpleNFWProfile):
+    def point_ds(self, r, *args, **kwargs):
+        return direct_circ_nfw(r, **self.pardict)
+
+    def single_rbin_ds(self, r0, r1, *args, **kwargs):
+        return direct_ring_nfw(r0, r1, **self.pardict)
 
 
 class TruncatedNFWProfile(DeltaSigmaProfile):
@@ -123,7 +140,13 @@ class OffsetNFWProfile(DeltaSigmaProfile):
         return ds_oc_nfw(r, **self.pardict)
 
     def single_rbin_ds(self, r0, r1, *args, **kwargs):
-        return ds_oc_nfw_ring(r0, r1, *self.profpars)
+        return ds_oc_nfw_ring(r0, r1, **self.pardict)
+
+
+class DirectOffsetCheck(OffsetNFWProfile):
+    def single_rbin_ds(self, r0, r1, *args, **kwargs):
+        return indirect_ring_oc_nfw(r0, r1, **self.pardict)
+
 
 
 
