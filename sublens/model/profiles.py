@@ -7,7 +7,7 @@ is a layer between what happens numerically and how it is interfaced with.
 
 import numpy as np
 
-from ..model import default_cosmo
+from sublens.io import default_cosmo
 from ..model.astroconvert import nfw_params
 
 from ..model.cycalc import tnfw
@@ -32,6 +32,7 @@ class DeltaSigmaProfile(object):
         self.cosmo = cosmo
         self.h = self.cosmo.H0.value / 100.
 
+        self.requires = []
         self.profpars = []
         self.parnames = []
         self.pardict = {}
@@ -40,6 +41,19 @@ class DeltaSigmaProfile(object):
         self.redges = None
         self.ds = None
 
+        self._prepared = False
+
+    def __str__(self):
+        return "DeltaSigmaProfile"
+
+    def reset(self):
+        self.rr = None
+        self.redges = None
+        self.ds = None
+
+        self.profpars = []
+        self.parnames = []
+        self.pardict = {}
         self._prepared = False
 
     def prepare(self, **kwargs):
@@ -52,7 +66,7 @@ class DeltaSigmaProfile(object):
 
     def deltasigma(self, rr, *args, **kwargs):
         """Creates a DeltaSigma profile by calling self.point_ds"""
-        assert self._prepared
+        assert self._prepared, "The profile parameters are not prepared!!!"
 
         if np.iterable(rr):
             ds = np.array([self.point_ds(r) for r in rr])
@@ -80,12 +94,24 @@ class DeltaSigmaProfile(object):
         self.redges = redges
         self.ds = res
 
+    def calc(self, rvals, mode, *args, **kwargs):
+        """tunable calculation"""
+        if mode == "rr":
+            self.deltasigma(rvals, *args, **kwargs)
+        elif mode == "edges":
+            self.rbin_deltasigma(rvals, *args, **kwargs)
+        else:
+            raise NotImplementedError('mode must be "rr" or "edges"' )
+
 
 class SimpleNFWProfile(DeltaSigmaProfile):
     """The conventional spherical NFW profile"""
     def __init__(self, cosmo=None):
         super().__init__(cosmo=cosmo)
         self.requires = sorted(['c200c', 'm200c', 'z'])
+
+    def __str__(self):
+        return "SimpleNFWProfile"
 
     def prepare(self, **kwargs):
         assert set(self.requires) <= set(kwargs)
@@ -105,6 +131,9 @@ class TruncatedNFWProfile(DeltaSigmaProfile):
     def __init__(self, cosmo=None):
         super().__init__(cosmo=cosmo)
         self.requires = sorted(['c200c', 'm200c', 'z', 'rt'])
+
+    def __str__(self):
+        return "TruncatedNFWProfile"
 
     def prepare(self, **kwargs):
         assert set(self.requires) <= set(kwargs)
@@ -126,6 +155,9 @@ class OffsetNFWProfile(DeltaSigmaProfile):
     def __init__(self, cosmo=None):
         super().__init__(cosmo=cosmo)
         self.requires = sorted(['c200c', 'm200c', 'z', 'dist'])
+
+    def __str__(self):
+        return "OffsetNFWProfile"
 
     def prepare(self, **kwargs):
         assert set(self.requires) <= set(kwargs)
