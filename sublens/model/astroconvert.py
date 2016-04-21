@@ -2,6 +2,7 @@
 Conversions and scaling relations related to astrophysisc/cosmology
 """
 
+import numpy as np
 import math
 import astropy.units as units
 import astropy.cosmology as cosmology
@@ -40,6 +41,29 @@ def nfw_params(cosmo, m200c, c200c, z, mlog10=True, *args, **kwargs):
     return (rs.value, rho_s.value), ('rs', 'rho_s')
 
 
+def lm200_rykoff_orig(l, **kwargs):
+    # FIXME this is a throwaway function
+    """
+    Matches redmapper richness to cluster m200
+
+    :param l: richness
+    :return: M200 [M_sun / h100]
+    """
+    mpivot = 1e14 # msun / h100
+    m200 = np.exp(1.48 + 1.06 * np.log(l / 60.)) * mpivot
+    return m200
+
+def fabrice_mlum_scaleing(rlum, h=1.0):
+    # FIXME this is a throwaway function
+    """Some rough scaling for r band galaxy mass..."""
+    Lpivot = 1.6e10 / h**2.
+    Mpivot = 18.6e11 / h
+    nu = 1.05
+
+    value = (rlum / Lpivot)**nu * Mpivot
+    return value
+
+
 class ConvertorBase(object):
     def __init__(self):
         self.requires = []
@@ -65,7 +89,7 @@ class DuffyCScale(ConvertorBase):
         self.c200 = -0.44
 
     def convert(self, ftab):
-        carr = self.a200 * (ftab[:, 0] / self.mpivot) ** self.b200 *\
+        carr = self.a200 * (10.**ftab[:, 0] / self.mpivot) ** self.b200 *\
                (1. + ftab[:, 1]) ** self.c200
         return carr
 

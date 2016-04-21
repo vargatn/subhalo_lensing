@@ -27,6 +27,7 @@ class TableMaker(object):
         :param etype:
         :param kwargs:
         """
+        # print(convertor, "hello")
 
         if not isinstance(profobj, DeltaSigmaProfile):
             raise TypeError('profobj must be a subclass of DeltaSigmaProfile')
@@ -49,7 +50,7 @@ class TableMaker(object):
 
         # checking convertor
         self.conversion_required = False
-        if not (convertor is None or isinstance(self.convertor, Convertor)):
+        if not (self.convertor is None or isinstance(self.convertor, ConvertorBase)):
             raise TypeError('convertor is of invalid type')
 
         # check if the table has all parameters that the profobj requires
@@ -115,6 +116,8 @@ class TableMaker(object):
         pnames = self.profobj.requires
         self.dstable = []
         for i, par in enumerate(self.fallgrid):
+            if i%50 ==0:
+                print(i)
             self.profobj.prepare(**dict(zip(pnames, par)))
             self.profobj.calc(rr, mode=mode)
             self.dstable.append(self.profobj.ds)
@@ -126,7 +129,7 @@ class TableMaker(object):
         self.time_stamp = str(datetime.datetime.utcnow())
         self.hasprofile = True
 
-    def make_table(self, fname):
+    def make_table(self, fname=None):
         """Creates a dictionary containing all calculation results"""
         assert self.hasprofile, 'First need to calculate!!!'
         table = {
@@ -145,7 +148,8 @@ class TableMaker(object):
             'cosmopars': self.cosmopars,
             'time_stamp': self.time_stamp,
         }
-        pickle.dump(table, open(fname, 'wb'))
+        if isinstance(fname, str):
+            pickle.dump(table, open(fname, 'wb'))
         return table
 
 
@@ -181,14 +185,18 @@ class LookupTable(object):
     def __str__(self):
         return "LookupTable"
 
-    def get_edges(self):
+    def get_edges(self, default_d_edge = 1.):
         """Creates DD histogram edges based on grid parameters"""
         edges = []
         for i, mid in enumerate(self.has_mids):
-            diff = np.diff(self.has_mids[i])
-            edge = np.array([mid[0] - diff[0]/2.] +
-                            list(np.array(mid[:-1] + diff/2.)) +
-                            [mid[-1] + diff[-1] / 2.])
+            if len(mid) > 1:
+                diff = np.diff(self.has_mids[i])
+                edge = np.array([mid[0] - diff[0]/2.] +
+                                list(np.array(mid[:-1] + diff/2.)) +
+                                [mid[-1] + diff[-1] / 2.])
+            else:
+                # edge = [mid[0] - default_d_edge, mid[0] + default_d_edge]
+                edge = [-np.inf, np.inf]
             edges.append(edge)
         return edges
 
