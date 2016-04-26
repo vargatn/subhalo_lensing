@@ -50,8 +50,10 @@ class TableMaker(object):
 
         # checking convertor
         self.conversion_required = False
-        if not (self.convertor is None or isinstance(self.convertor, ConvertorBase)):
-            raise TypeError('convertor is of invalid type')
+        # print(ConvertorBase, self.convertor)
+        # if not (self.convertor is None or issubclass(self.convertor,
+        #                                              ConvertorBase)):
+        #     raise TypeError('convertor is of invalid type')
 
         # check if the table has all parameters that the profobj requires
         if self.haspars == self.profobj.requires:
@@ -96,7 +98,7 @@ class TableMaker(object):
         if not self.conversion_required:
             raise RuntimeError('Conversion is NOT required/possible!!!')
 
-        convlist = self.convertor.convert(self.fgrid)
+        convlist = self.convertor.convert(self.fgrid, self.haspars)
         if not convlist.shape[1] == len(self.convertor.provides):
             raise TypeError('Convertor returned array with invalid shape')
 

@@ -70,6 +70,16 @@ class ConvertorBase(object):
         self.requires = []
         self.provides = []
 
+    def _get_indices(self, parnames):
+        indices = np.arange(len(self.requires))
+        if parnames is not None:
+            indices = np.array([np.where(req == np.array(parnames))[0][0]
+                                for req in self.requires])
+        if len(set(indices)) != len(indices):
+            raise NameError("duplicate parameter name specified!")
+
+        return indices
+
     def convert(self, ftab):
         raise NotImplementedError
 
@@ -89,11 +99,14 @@ class DuffyCScale(ConvertorBase):
         self.b200 = -0.091
         self.c200 = -0.44
 
-    def convert(self, ftab):
+    def convert(self, ftab, parnames=None):
 
-        # TODO update this to detect indices of the required columns
-        # TODO make toggleable logarithmic parameters
-        carr = self.a200 * (10.**ftab[:, 0] / self.mpivot) ** self.b200 *\
-               (1. + ftab[:, 1]) ** self.c200
-        return carr
+        indices = self._get_indices(parnames)
+
+        marr = ftab[:, indices[0]]
+        zarr = ftab[:, indices[1]]
+
+        carr = self.a200 * (10.**marr / self.mpivot) ** self.b200 *\
+               (1. + zarr) ** self.c200
+        return carr[:, np.newaxis]
 

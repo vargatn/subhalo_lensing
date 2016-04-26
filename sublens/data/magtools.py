@@ -13,8 +13,9 @@ import scipy.integrate as integr
 class Luminosity(object):
     def __init__(self):
         self.survey = "mock-DES (SDSS)"
-        self.bands = ["r"]
-        self.msol = [4.52]
+        self.msol = {
+            "r": 4.52,
+        }
 
     @classmethod
     def m2lum(cls, mag, band):
@@ -22,8 +23,12 @@ class Luminosity(object):
         return llcls.magtolum(mag, band)
 
     def magtolum(self, mag, band):
-        mind = np.where(band == self.bands)
-        lum = 10. ** ((self.msol[mind] - mag) / 2.5)
+        try:
+            lum = 10. ** ((self.msol[band] - mag) / 2.5)
+        except KeyError:
+            print('band ' + band + " is not specified!, use: " +
+            str(*list(self.msol.keys())))
+            raise
         return lum
 
 
