@@ -53,6 +53,7 @@ def lm200_rykoff_orig(l, **kwargs):
     m200 = np.exp(1.48 + 1.06 * np.log(l / 60.)) * mpivot
     return m200
 
+
 def fabrice_mlum_scaleing(rlum, h=1.0):
     # FIXME this is a throwaway function
     """Some rough scaling for r band galaxy mass..."""
@@ -89,6 +90,9 @@ class DuffyCScale(ConvertorBase):
         self.c200 = -0.44
 
     def convert(self, ftab):
+
+        # TODO update this to detect indices of the required columns
+        # TODO make toggleable logarithmic parameters
         carr = self.a200 * (10.**ftab[:, 0] / self.mpivot) ** self.b200 *\
                (1. + ftab[:, 1]) ** self.c200
         return carr

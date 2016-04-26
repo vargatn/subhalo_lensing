@@ -249,15 +249,15 @@ class StackedProfileContainer(object):
         # calculating combined profiles
         dsum_jack = np.sum(self.data[3, :, nzind] * self.w,  axis=1) /\
                     np.sum(self.w)
-        dsensum_jack = np.sum(self.data[5, :, nzind] * self.w, axis=1) /\
+        dsum_w_jack = np.sum(self.data[5, :, nzind] * self.w, axis=1) /\
                        np.sum(self.w)
-        self.dst0[nzind] = dsum_jack / dsensum_jack
+        self.dst0[nzind] = dsum_jack / dsum_w_jack
 
         osum_jack = np.sum(self.data[4, :, nzind] * self.w, axis=1) /\
                     np.sum(self.w)
-        osensum_jack = np.sum(self.data[6, :, nzind] * self.w, axis=1) /\
+        osum_w_jack = np.sum(self.data[6, :, nzind] * self.w, axis=1) /\
                        np.sum(self.w)
-        self.dsx0[nzind] = osum_jack / osensum_jack
+        self.dsx0[nzind] = osum_jack / osum_w_jack
 
     def _subprofiles(self):
         """Calculates subprofiles for each patch"""
@@ -275,18 +275,18 @@ class StackedProfileContainer(object):
             dsum_jack = np.sum(self.data[3, ind][:, cind] *
                                self.w[ind, np.newaxis], axis=0) /\
                         np.sum(self.w[ind])
-            dsensum_jack = np.sum(self.data[5, ind][:, cind] *
+            dsum_w_jack = np.sum(self.data[5, ind][:, cind] *
                                   self.w[ind, np.newaxis], axis=0) /\
                            np.sum(self.w[ind])
-            self.dst_sub[cind, lab] = dsum_jack / dsensum_jack
+            self.dst_sub[cind, lab] = dsum_jack / dsum_w_jack
 
             osum_jack = np.sum(self.data[4, ind][:, cind] *
                                self.w[ind, np.newaxis], axis=0) /\
                         np.sum(self.w[ind])
-            osensum_jack = np.sum(self.data[6, ind][:, cind] *
+            osum_w_jack = np.sum(self.data[6, ind][:, cind] *
                                   self.w[ind, np.newaxis], axis=0) /\
                            np.sum(self.w[ind])
-            self.dsx_sub[cind, lab] = osum_jack / osensum_jack
+            self.dsx_sub[cind, lab] = osum_jack / osum_w_jack
 
     def _profcalc(self):
         """JK estimate on the mean profile"""

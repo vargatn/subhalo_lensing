@@ -10,23 +10,21 @@ import scipy.interpolate as interp
 import scipy.integrate as integr
 
 
-
 class Luminosity(object):
     def __init__(self):
         self.survey = "mock-DES (SDSS)"
         self.bands = ["r"]
         self.msol = [4.52]
 
+    @classmethod
+    def m2lum(cls, mag, band):
+        llcls = cls()
+        return llcls.magtolum(mag, band)
+
     def magtolum(self, mag, band):
-        pass
-        # ret
-
-
-def rmag2lum(rmag):
-    # FIXME this is a throwaway function
-    rmsol = 4.52
-    lum = 10. ** ((rmsol - rmag) / 2.5)
-    return lum
+        mind = np.where(band == self.bands)
+        lum = 10. ** ((self.msol[mind] - mag) / 2.5)
+        return lum
 
 
 class AbsMagConverter(object):
