@@ -61,7 +61,7 @@ class RawProfileContainer(object):
         self.info = info
         self.ra = ra
         self.dec = dec
-        self.cat = cat
+        self.cat = np.array(cat)
         self.nbin = _get_nbin(data)
         self.rmin = rmin
         self.rmax = rmax
@@ -102,6 +102,7 @@ class RawProfileContainer(object):
         """
         if ind is None:
             ind = np.arange(len(self.ra))
+
         return RawProfileContainer(self.data[:, ind, :], self.info[ind, :],
                                    self.ra[ind], self.dec[ind],
                                    self.cat[:][ind], rmin=self.rmin,

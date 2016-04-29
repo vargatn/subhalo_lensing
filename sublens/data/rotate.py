@@ -77,7 +77,7 @@ def cart2spher(cart, deg=True):
     """Cartesian to Spherical"""
     cart = np.array(cart, copy=True, dtype='float64')
     r = np.sqrt(np.sum(cart ** 2.))
-    az = np.arctan2(cart[1], cart[0])
+    az = np.arctan2(cart[1], cart[0]) + np.pi  # for az -> RA
     lat = np.arcsin(cart[2] / r)
 
     spher = np.array([az, lat])
@@ -103,6 +103,6 @@ def rot_center(rd, cent, angle=180., deg=True):
     cart = np.expand_dims(cart, axis=1)
 
     res_rot = np.array(np.dot(Rot, np.matrix(cart))).transpose((1, 0)).T
-    new_rd = cart2spher(res_rot[:, 0])
+    new_rd = cart2spher(res_rot[:, 0], deg=deg)
     return new_rd
 

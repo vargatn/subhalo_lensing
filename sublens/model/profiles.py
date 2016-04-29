@@ -75,7 +75,7 @@ class DeltaSigmaProfile(object):
             rr = np.array([rr])
 
         self.rr = rr
-        self.ds = ds
+        self.ds = ds / 1e12
 
     def single_rbin_ds(self, r0, r1, *args, **kwargs):
         """Evaluates the ring averaged DeltaSigma for a single ring"""
@@ -90,9 +90,9 @@ class DeltaSigmaProfile(object):
         # this is assuming a constant source surface density
         self.rr = np.array([(redges[i + 1] ** 3. - redges[i] ** 3.) /
                             (redges[i + 1] ** 2. - redges[i] ** 2.)
-                            for i, val in enumerate(redges[:-1])])  * 2. / 3.
+                            for i, val in enumerate(redges[:-1])]) * 2. / 3.
         self.redges = redges
-        self.ds = res
+        self.ds = res / 1e12
 
     def calc(self, rvals, mode, *args, **kwargs):
         """tunable calculation"""
@@ -101,7 +101,7 @@ class DeltaSigmaProfile(object):
         elif mode == "edges":
             self.rbin_deltasigma(rvals, *args, **kwargs)
         else:
-            raise NotImplementedError('mode must be "rr" or "edges"' )
+            raise ValueError('mode must be "rr" or "edges"' )
 
 
 class SimpleNFWProfile(DeltaSigmaProfile):
@@ -172,5 +172,38 @@ class OffsetNFWProfile(DeltaSigmaProfile):
 
     def single_rbin_ds(self, r0, r1, *args, **kwargs):
         return oc_nfw_ring(r0, r1, **self.pardict)
+
+
+# FIXME this is a priority 1 task
+class SubhaloProfile(DeltaSigmaProfile):
+    def __init__(self):
+        super().__init__()
+
+
+# FIXME this is a priority 1 task
+class ParenthaloPofile(DeltaSigmaProfile):
+    def __init__(self):
+        super().__init__()
+
+
+# -----------------------------------------------------------------------------
+
+
+# TODO Add 2halo term with single bias parameter
+class CorrelatedMatterProfile(DeltaSigmaProfile):
+    def __init__(self):
+        super().__init__()
+
+
+# TODO This is similar to the above, but with off-centering added
+class OffsetCorrelatedMatterProfile(DeltaSigmaProfile):
+    def __init__(self):
+        super().__init__()
+
+
+# TODO this is for the cluster BCG...
+class SingularProfile(DeltaSigmaProfile):
+    def __init__(self):
+        super().__init__()
 
 

@@ -83,7 +83,11 @@ class ConvertorBase(object):
     def convert(self, ftab):
         raise NotImplementedError
 
+    def update(self, *args, **kwargs):
+        raise NotImplementedError
 
+
+# TODO documentation!!!
 class DuffyCScale(ConvertorBase):
     def __init__(self):
         """
@@ -109,4 +113,14 @@ class DuffyCScale(ConvertorBase):
         carr = self.a200 * (10.**marr / self.mpivot) ** self.b200 *\
                (1. + zarr) ** self.c200
         return carr[:, np.newaxis]
+
+    def update(self, *args, **kwargs):
+        pass
+
+
+# TODO write fittable converter
+class Lum2Mass(ConvertorBase):
+    def __init__(self):
+        super().__init__()
+
 

@@ -13,6 +13,7 @@ from ..io.iocosmo import get_cosmopars
 from ..model.profiles import DeltaSigmaProfile
 
 
+# FIXME watch out for TypeErrors coming from the set(list) operations!!
 class TableMaker(object):
     def __init__(self, profobj, convertor=None, **kwargs):
         """
@@ -64,11 +65,15 @@ class TableMaker(object):
         # Checking if the convertor is able to fill in the missing paramters
         elif self.convertor is not None and\
                         set(self.convertor.requires) <= set(self.haspars):
-            if (sorted(self.convertor.provides +
-                           self.haspars) != self.profobj.requires):
+            if (set(self.convertor.provides +
+                           self.haspars) < set(self.profobj.requires)):
                 raise SyntaxError(('The convertor does not provide'
                                    ' the appropiate parameters, or overwrites'
                                    ' the specified ones'))
+            elif (set(self.convertor.provides +
+                        self.haspars) > set(self.profobj.requires)):
+                warnings.warn('Unused parameters specified!', SyntaxWarning)
+
             self.conversion_required = True
         # otherwise raise error, becouse no calcultion can be performed
         else:
@@ -109,7 +114,7 @@ class TableMaker(object):
         # resets the flag
         self.conversion_required = False
 
-    def calc_ds(self, rr, mode="rr"):
+    def calc_ds(self, rr, mode="rr", verbose_step=None):
         """Calculates the DeltaSigma profile for each parameter entry"""
         if not np.iterable(rr):
             rr = [rr]
@@ -118,7 +123,7 @@ class TableMaker(object):
         pnames = self.profobj.requires
         self.dstable = []
         for i, par in enumerate(self.fallgrid):
-            if i%50 ==0:
+            if verbose_step is not None and i%int(verbose_step) == 0:
                 print(i)
             self.profobj.prepare(**dict(zip(pnames, par)))
             self.profobj.calc(rr, mode=mode)
@@ -209,8 +214,12 @@ class LookupTable(object):
         weights = counts.flatten() / np.sum(counts)
         return weights
 
-    def combine_profile(self, sample):
+    def combine_profile(self, sample, parnames):
         """Make mine like yours!... """
+
+        if not parnames == self.table['haspars']:
+            raise ValueError('invalid parameter names or order!')
+
         self.edges = self.get_edges()
         self.ww = self.get_weights(sample)
         self.ds_comb = np.average(self.dstable, axis=0, weights=self.ww)
