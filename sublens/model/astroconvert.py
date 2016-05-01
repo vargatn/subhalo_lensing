@@ -70,6 +70,12 @@ class ConvertorBase(object):
         self.requires = []
         self.provides = []
 
+        self.pivots0 = {}
+        self.pivots = {}
+
+        self.exponents = {}
+        self.exponents0 = {}
+
     def _get_indices(self, parnames):
         indices = np.arange(len(self.requires))
         if parnames is not None:
@@ -83,8 +89,15 @@ class ConvertorBase(object):
     def convert(self, ftab):
         raise NotImplementedError
 
-    def update(self, *args, **kwargs):
-        raise NotImplementedError
+    def update(self, new_pivots=None, new_exp=None, **kwargs):
+        if new_pivots is not None and isinstance(new_pivots, dict):
+            self.pivots = new_pivots
+        if new_exp is not None and isinstance(new_exp, dict):
+            self.exponents = new_exp
+
+    def reset(self, *args, **kwargs):
+        self.pivots = self.pivots0.copy()
+        self.exponents = self.exponents0.copy()
 
 
 # TODO documentation!!!
@@ -114,13 +127,93 @@ class DuffyCScale(ConvertorBase):
                (1. + zarr) ** self.c200
         return carr[:, np.newaxis]
 
-    def update(self, *args, **kwargs):
-        pass
 
-
-# TODO write fittable converter
-class Lum2Mass(ConvertorBase):
+class SimpleSubhaloMapper(ConvertorBase):
     def __init__(self):
         super().__init__()
+
+        self.requires = sorted(['r-Lum', 'dist'])
+        self.provides = sorted(['m200c', 'c200c'])
+
+        self.pivots0 = {
+            'lum_pivot': 10.514,
+            'm_pivot': 12.4,
+            'c_pivot': 6.67,
+        }
+
+        self.exponents0 = {
+            'lexp': 1.05,
+            'rexp_m': 0.0,
+            'rexp_c': 0.0,
+            'mexp': -0.092,
+        }
+
+        self.pivots = self.pivots0.copy()
+        self.exponents = self.exponents0.copy()
+
+    def __str__(self):
+        return "SimpleSubhaloMapper"
+
+    def convert(self, ftab, parnames=None):
+        indices = self._get_indices(parnames)
+        rlum_arr = 10. ** ftab[:, indices[0]]
+        r_arr = ftab[:, indices[1]]
+
+        mpivot = 10. ** self.pivots['m_pivot']
+        lpivot = 10. ** self.pivots['lum_pivot']
+
+        marr = mpivot * (rlum_arr / lpivot) ** self.exponents['lexp']\
+               * r_arr ** self.exponents['rexp_m']
+
+        carr = self.pivots['c_pivot'] *\
+               (marr / mpivot) ** self.exponents['mexp'] *\
+               r_arr ** self.exponents['rexp_c']
+
+        restab = np.vstack((carr, np.log10(marr))).T
+        return restab
+
+
+class SimpleParentMapper(ConvertorBase):
+    def __init__(self):
+        super().__init__()
+
+        self.requires = sorted(['lambda'])
+        self.provides = sorted(['m200c', 'c200c'])
+
+        self.pivots0 = {
+            'm_pivot': 14.0,
+            'lamb_pivot': 60.0,
+            'mc_pivot': 12.4,
+            'c_pivot': 6.67,
+        }
+
+        self.exponents0 = {
+            'lexp0': 1.48,
+            'lexp1': 1.06,
+            'mexp': -0.092,
+        }
+
+        self.pivots = self.pivots0.copy()
+        self.exponents = self.exponents0.copy()
+
+    def __str__(self):
+        return "SimpleParentMapper"
+
+    def convert(self, ftab, parnames=None):
+        indices = self._get_indices(parnames)
+
+        mpivot = 10. ** self.pivots['m_pivot']
+        lamb = ftab[:, indices[0]]
+
+        marr= np.exp(self.exponents['lexp0'] + self.exponents['lexp1'] *
+                      np.log(lamb / self.pivots['lamb_pivot'])) * mpivot
+
+        carr =  self.pivots['c_pivot'] * \
+                (marr / mpivot) ** self.exponents['mexp']
+
+        restab = np.vstack((carr, np.log10(marr))).T
+        return restab
+
+
 
 

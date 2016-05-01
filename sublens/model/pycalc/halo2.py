@@ -37,9 +37,9 @@ class W2calc(object):
             return res * x
         return np.vectorize(ufunclike)
 
-    def wint(self, theta, N=100, h=0.03):
+    def wint(self, theta, nn=100, hh=0.03):
         fpow = self.fmaker(theta)
-        h = hankel.HankelTransform(nu=2, N=N, h=h)
+        h = hankel.HankelTransform(nu=2, N=nn, h=hh)
         val = h.transform(fpow) / theta**2. / (2. * math.pi)
 
         # prefactor before the integral
