@@ -183,14 +183,14 @@ class SimpleParentMapper(ConvertorBase):
         self.pivots0 = {
             'm_pivot': 14.0,
             'lamb_pivot': 60.0,
-            'mc_pivot': 12.4,
-            'c_pivot': 6.67,
+            # 'mc_pivot': 12.4,
+            # 'c_pivot': 6.67,
         }
 
         self.exponents0 = {
             'lexp0': 1.48,
             'lexp1': 1.06,
-            'mexp': -0.092,
+            # 'mexp': -0.092,
         }
 
         self.pivots = self.pivots0.copy()
@@ -208,10 +208,12 @@ class SimpleParentMapper(ConvertorBase):
         marr= np.exp(self.exponents['lexp0'] + self.exponents['lexp1'] *
                       np.log(lamb / self.pivots['lamb_pivot'])) * mpivot
 
-        carr =  self.pivots['c_pivot'] * \
-                (marr / mpivot) ** self.exponents['mexp']
+        # carr =  self.pivots['c_pivot'] * \
+        #         (marr / mpivot) ** self.exponents['mexp']
+        #
+        # restab = np.vstack((carr, np.log10(marr))).T
 
-        restab = np.vstack((carr, np.log10(marr))).T
+        restab = np.log10(marr)[:, np.newaxis]
         return restab
 
 
