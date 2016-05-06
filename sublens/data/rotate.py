@@ -77,7 +77,7 @@ def cart2spher(cart, deg=True):
     """Cartesian to Spherical"""
     cart = np.array(cart, copy=True, dtype='float64')
     r = np.sqrt(np.sum(cart ** 2.))
-    az = np.arctan2(cart[1], cart[0]) + np.pi  # for az -> RA
+    az = np.arctan2(cart[1], cart[0])
     lat = np.arcsin(cart[2] / r)
 
     spher = np.array([az, lat])
