@@ -212,9 +212,10 @@ class LookupTable(object):
         gshape = self.par_grid.shape[1:]
         counts, _edges = np.histogramdd(sample, bins=self.edges)
         weights = counts.flatten() / np.sum(counts)
+
         return weights
 
-    def combine_profile(self, sample, parnames):
+    def combine_profile(self, sample, parnames, checknan=True):
         """Make mine like yours!... """
 
         if not parnames == self.table['haspars']:
@@ -222,5 +223,11 @@ class LookupTable(object):
 
         self.edges = self.get_edges()
         self.ww = self.get_weights(sample)
-        self.ds_comb = np.average(self.dstable, axis=0, weights=self.ww)
+
+        if checknan:
+            dstable = np.nan_to_num(self.dstable)
+        else:
+            dstable = self.dstable
+
+        self.ds_comb = np.average(dstable, axis=0, weights=self.ww)
         return self.rr, self.ds_comb

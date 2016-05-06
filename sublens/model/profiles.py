@@ -9,6 +9,7 @@ import numpy as np
 
 from sublens.io import default_cosmo
 from ..model.astroconvert import nfw_params
+from ..model.astroconvert import nfw_params500
 
 from ..model.cycalc import tnfw
 from ..model.cycalc import tnfw_ring
@@ -124,6 +125,29 @@ class SimpleNFWProfile(DeltaSigmaProfile):
 
     def single_rbin_ds(self, r0, r1, *args, **kwargs):
         return nfw_ring(r0, r1, **self.pardict)
+
+
+class SimpleNFWProfile500(DeltaSigmaProfile):
+    """The conventional spherical NFW profile"""
+    def __init__(self, cosmo=None):
+        super().__init__(cosmo=cosmo)
+        self.requires = sorted(['c500c', 'm500c', 'z'])
+
+    def __str__(self):
+        return "SimpleNFWProfile"
+
+    def prepare(self, **kwargs):
+        assert set(self.requires) <= set(kwargs)
+        self.profpars, self.parnames = nfw_params500(self.cosmo, **kwargs)
+        self.pardict = dict(zip(self.parnames, self.profpars))
+        self._prepared = True
+
+    def point_ds(self, r, *args, **kwargs):
+        return nfw_deltasigma(r, **self.pardict)
+
+    def single_rbin_ds(self, r0, r1, *args, **kwargs):
+        return nfw_ring(r0, r1, **self.pardict)
+
 
 
 class TruncatedNFWProfile(DeltaSigmaProfile):

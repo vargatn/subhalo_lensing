@@ -84,7 +84,7 @@ def fread(fname, mode='auto', **kwargs):
     return raw_data
 
 
-def xread(fname, mode="dat", **kwargs):
+def xread(fname, fmode="dat", xmode='reduced', **kwargs):
     """
     Loads lensfit style output from xshear
 
@@ -95,11 +95,11 @@ def xread(fname, mode="dat", **kwargs):
     :return: info, data, valnames
     """
 
-    raw_data = fread(fname, mode)
-    return xhandler(raw_data, **kwargs)
+    raw_data = fread(fname, fmode)
+    return xhandler(raw_data, xmode, **kwargs)
 
 
-def xhandler(xdata, **kwargs):
+def xhandler(xdata, xmode='reduced', **kwargs):
     """
     Converts xshear output table into a readable format
 
@@ -125,15 +125,61 @@ def xhandler(xdata, **kwargs):
     osensum_i:  sum of weights times sensitivities
 
     :param xdata: xshear data file
+    :param
     :returns: info, data, valnames
     """
 
-    try:
-        info, data, valnames = xlensfit(xdata)  # this one expects more columns
-    except IndexError:
+    if xmode == 'reduced':
         info, data, valnames = xreduced(xdata)
+    elif xmode == 'sample':
+        info, data, valnames = xsample(xdata)
+    elif xmode == 'lensfit':
+        info, data, valnames = xlensfit(xdata)
+    else:
+        raise ValueError('invalid type specified')
 
     return info, data, valnames
+
+
+def xsample(xdata, **kwargs):
+    """Loader for reduced-style xshear output"""
+    valnames = {
+        "info": ("index", "weight_tot", "totpairs"),
+        "data": ("npair_i", "rsum_i", "wsum_i", "dsum_i", "osum_i",
+                 'wscinvsum_i', 'wscinvsum_i'),
+    }
+
+    # calculates number of radial bins used
+    bins = (xdata.shape[1] - 3) // 6
+    # position indexes
+    sid = 3
+    pos_npair = 0
+    pos_rsum = 1
+    pos_wsum = 2
+    pos_dsum = 3
+    pos_osum = 4
+    pos_scinv = 5
+
+    gid = xdata[:, 0]
+    weight_tot = xdata[:, 1]
+    tot_pairs = xdata[:, 2]
+    npair = xdata[:, sid + pos_npair * bins: sid + (pos_npair + 1) * bins]
+    rsum = xdata[:, sid + pos_rsum * bins: sid + (pos_rsum + 1) * bins]
+    wsum = xdata[:, sid + pos_wsum * bins: sid + (pos_wsum + 1) * bins]
+    scinv = xdata[:, sid + pos_scinv * bins: sid + (pos_scinv + 1) * bins]
+    dsum = xdata[:, sid + pos_dsum * bins: sid + (pos_dsum + 1) * bins]
+    osum = xdata[:, sid + pos_osum * bins: sid + (pos_osum + 1) * bins]
+
+    info = np.vstack((gid, weight_tot, tot_pairs)).T
+
+    data = np.dstack((npair, rsum, wsum, dsum, osum, scinv, scinv))
+    data = np.transpose(data, axes=(2, 0, 1))
+
+    # checking if loading made sense
+    assert (info[:, 2] == np.sum(data[0, :, :], axis=1)).all()
+
+    return info, data, valnames
+
 
 
 def xreduced(xdata, **kwargs):
