@@ -80,6 +80,9 @@ def cart2spher(cart, deg=True):
     az = np.arctan2(cart[1], cart[0])
     lat = np.arcsin(cart[2] / r)
 
+    if az < 0.0:
+        az += np.pi
+
     spher = np.array([az, lat])
     if deg:
         spher  *= 180. / np.pi
