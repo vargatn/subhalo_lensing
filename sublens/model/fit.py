@@ -4,6 +4,8 @@ MCMC base and likelihoods
 
 import numpy as np
 
+from .profiles import SimpleNFWProfile
+
 # TODO implement this module
 
 
@@ -154,8 +156,89 @@ class EnsembleLikelihood(LikelihoodBase):
         return chisq
 
 
+class SuperCompositeHaloLikelihood(LikelihoodBase):
+    """
+    Some frankenstein monster of a likelihood... Aaaaargh...
+    """
+    def __init__(self, table, obs_params, obs_profile0, obs_profile1,  mode='point', fit_range=None):
+        super().__init__()
+        self.mode = mode
+
+        self.profobj = SimpleNFWProfile()
+        self.table = table
+        self.obs_params = obs_params
+        self.obs_profile0 = obs_profile0
+        self.obs_profile1 = obs_profile1
+#         self.requires = self.profobj.requires
+
+        self.rr = self.obs_profile0['rr']
+        self.mvec0 = np.zeros(shape=self.rr.shape)
+        self.mvec1 = np.zeros(shape=self.rr.shape)
+        self.mvec = np.zeros(shape=self.rr.shape)
+        self.fit_range = fit_range
+
+        self.zind = np.where('z'==np.array(self.obs_params['par_names']))[0]
+        self.zmean = np.mean(self.obs_params['par_values'][:, self.zind])
+
+        self.distind = np.where('dist' == np.array(self.obs_params['par_names']))[0]
+
+        self.values = self.obs_params['par_values']
+
+    def get_like(self, msub, csub, mparent, d0=0.0):
+
+        redges = self.obs_profile0['r_edges']
+        rcens = self.obs_profile0['rr']
+
+        if self.fit_range is None:
+            self.fit_range = (0., np.inf)
+        index = np.where((self.fit_range[0] <= rcens) *
+                         (self.fit_range[1] > rcens))[0]
+
+        # getting first likelihood
+        self.profobj.prepare(m200c=msub, c200c=csub, z=self.zmean)
+
+        self.profobj.rbin_deltasigma(redges)
+        self.mvec0 = self.profobj.ds
+
+        mparnames = ['dist', 'm200c', 'z']
+
+        massarr = np.ones(len(self.values)) * mparent
+        zarr = np.ones(len(self.values)) * self.zmean
+        darr = (self.values[:, self.distind]/ 0.7) - d0
+        mpars = np.hstack((darr, massarr[:, np.newaxis], zarr[:, np.newaxis]))
+        mrr, self.mvec1 = self.table.combine_profile(mpars, mparnames, checknan=True)
+
+        self.mvec = self.mvec0 + self.mvec1
+
+        dvec = self.obs_profile0['ds'][index]
+
+        cov = self.obs_profile0['cov'][index, :][:, index]
+        diff = (dvec - self.mvec[index])
+        cinv = np.linalg.inv(cov)
+        chisq0 = float(np.dot(diff.T, np.dot(cinv, diff)))
+
+        # getting second likelihood
+        massarr = np.ones(len(self.values)) * mparent
+        zarr = np.ones(len(self.values)) * self.zmean
+        darr = (self.values[:, self.distind]/ 0.7) + d0
+        mpars = np.hstack((darr, massarr[:, np.newaxis], zarr[:, np.newaxis]))
+        mrr, self.mvec2 = self.table.combine_profile(mpars, mparnames, checknan=True)
+
+        self.mvec_others = [self.mvec0, self.mvec1]
+
+        dvec = self.obs_profile1['ds'][index]
+
+        cov = self.obs_profile1['cov'][index, :][:, index]
+        diff = (dvec - self.mvec2[index])
+        cinv = np.linalg.inv(cov)
+        chisq1 = float(np.dot(diff.T, np.dot(cinv, diff)))
+
+
+        return chisq0 + chisq1
+
+
 def mcmc(like, names, par0, stepsize, limits, extra_pars=None, nstep=10,
-         seed=None, rng=None, verbose_step=None, **kwargs):
+         seed=None, rng=None, verbose_step=None, covstep=None, **kwargs):
     if rng is None:
         rng = np.random.RandomState(seed=seed)
 
@@ -176,7 +259,8 @@ def mcmc(like, names, par0, stepsize, limits, extra_pars=None, nstep=10,
     dsvec = np.array([like.mvec])
 
     # step covariance matrix
-    stepmatr = np.diag(stepsize)
+    if len(np.array(stepsize).shape) == len(par0):
+           stepmatr = np.diag(stepsize)
 
     # going through the steps
     for i in np.arange(nstep):
