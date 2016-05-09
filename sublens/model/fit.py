@@ -258,6 +258,7 @@ def mcmc(like, names, par0, stepsize, limits, extra_pars=None, nstep=10,
     ds_other_cont.append(ds_other)
     dsvec = np.array([like.mvec])
 
+    stepsize = np.array(stepsize.copy())
     # step covariance matrix
     if len(stepsize) == len(par0) and len(stepsize.shape) == 1:
         stepmatr = np.diag(stepsize)
