@@ -20,6 +20,7 @@ from ..model.pycalc.full_nfw import nfw_ring
 from ..model.pycalc.full_nfw import oc_nfw
 from ..model.pycalc.full_nfw import oc_nfw_ring
 
+from ..model.pycalc import W2calc
 
 class DeltaSigmaProfile(object):
     """Base class for lensing shear profiles"""
@@ -209,14 +210,34 @@ class ParenthaloPofile(DeltaSigmaProfile):
     def __init__(self):
         super().__init__()
 
+# -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
 
-
-# TODO Add 2halo term with single bias parameter
 class CorrelatedMatterProfile(DeltaSigmaProfile):
-    def __init__(self):
+    """Simple 2-halo term for lensing analysis"""
+    def __init__(self, z, powspec, cosmo, scalar_ind=0.96):
         super().__init__()
+        self.requires = sorted(['b'])
+        self.powspec = z
+        self.powspec = powspec
+        self.cosmo = cosmo
+
+        self.w2calc = W2calc(z, powspec, cosmo, scalar_ind)
+
+    def __str__(self):
+        return "Simple2HaloTerm"
+
+    def prepare(self, **kwargs):
+        assert set(self.requires) <= set(kwargs)
+        self.pardict = {"b": kwargs["b"]}
+        self._prepared = True
+
+    def point_ds(self, r, *args, **kwargs):
+        return self.w2calc.warr(np.array([r,]))[0] * self.pardict["b"]
+
+    def rbin_deltasigma(self, redges, *args, **kwargs):
+        raise NotImplementedError
 
 
 # TODO This is similar to the above, but with off-centering added

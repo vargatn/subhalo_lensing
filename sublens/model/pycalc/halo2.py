@@ -13,44 +13,54 @@ class W2calc(object):
         self.cosmo = cosmo
         self.scalar_ind = scalar_ind
 
-    def fmaker(self, theta):
+    def fmaker(self, rr):
         karr = self.spectra[:, 0]
         parr = self.spectra[:, 1]
-        pkfunc = interp.interp1d(karr, parr, bounds_error=True, fill_value=np.nan)
-        lower_norm = (pkfunc(karr[1]) / karr[1]**self.scalar_ind)
-        upper_norm = pkfunc(karr[-2]) / (karr[-2]**(self.scalar_ind - 4)
-                                     * np.log(karr[-2])**2)
+        pkfunc = interp.interp1d(karr, parr, bounds_error=True,
+                                 fill_value=np.nan)
+        lower_norm = (pkfunc(karr[1]) / karr[1] ** self.scalar_ind)
+        upper_norm = pkfunc(karr[-2]) / (karr[-2] ** (self.scalar_ind - 4)
+                                         * np.log(karr[-2]) ** 2)
 
-        da = self.cosmo.angular_diameter_distance(self.z).value
-        kfactor = (1. + self.z) * da
         scalar_ind = self.scalar_ind
-
         def ufunclike(x):
-            kval = x / theta / kfactor
+            kval = x / rr
             res = 0.0
             if kval > karr[-2]:
-                res = kval ** (scalar_ind - 4) * np.log(kval)**2. * upper_norm
+                res = kval ** (scalar_ind - 4) * np.log(
+                    kval) ** 2. * upper_norm
             elif kval < karr[1]:
                 res = kval ** scalar_ind * lower_norm
             else:
                 res = pkfunc(kval)
-            return res * x
+            return res * kval
+
         return np.vectorize(ufunclike)
 
-    def wint(self, theta, nn=100, hh=0.03):
-        fpow = self.fmaker(theta)
+    def wint(self, rr, nn=100, hh=0.03):
+        fpow = self.fmaker(rr)
         h = hankel.HankelTransform(nu=2, N=nn, h=hh)
-        val = h.transform(fpow) / theta**2. / (2. * math.pi)
+        val = h.transform(fpow) / rr / (2. * np.pi)
+        return val
 
-        # prefactor before the integral
-        da = self.cosmo.angular_diameter_distance(self.z).value
-        cdens0 = self.cosmo.critical_density0.to(u.solMass / u.Mpc**3.).value
-        Om0 = self.cosmo.Om0
-        prefac = cdens0 * Om0 / da**2 / (1. + self.z) ** 3.
+    def warr(self, rarr, nn=100, hh=0.03):
+        intres = np.array([self.wint(rr, nn=nn, hh=hh) for rr in rarr])
+        prefac = self.cosmo.critical_density(self.z) *\
+                 self.cosmo.Om(self.z)
+        prefac = prefac.to(u.solMass/ u.Mpc**3)
 
-        return val * prefac
+        return intres * prefac
 
-    def warr(self, rarr, N=100, h=0.03):
-        da = self.cosmo.angular_diameter_distance(self.z).value
-        thetarr = rarr / da
-        return np.array([self.wint(theta, N=N, h=h) for theta in thetarr])
+
+
+
+
+
+
+
+
+
+
+
+
+

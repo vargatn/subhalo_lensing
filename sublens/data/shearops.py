@@ -7,6 +7,7 @@ import numpy as np
 import kmeans_radec as krd
 import pickle
 import os
+from multiprocessing import Pool
 
 from ..io import xread, fread
 
@@ -149,6 +150,8 @@ class StackedProfileContainer(object):
         self.subcounts = None
         self.indexes = None
         self.non_indexes = None
+        self.hasval = None
+        self.wdata = None
 
         self.dsx_sub = None
         self.dst_sub = None
@@ -248,18 +251,27 @@ class StackedProfileContainer(object):
                   np.sum(self.data[2, :, nzind], axis=1)
 
         # calculating combined profiles
-        dsum_jack = np.sum(self.data[3, :, nzind] * self.w,  axis=1) /\
-                    np.sum(self.w)
-        dsum_w_jack = np.sum(self.data[5, :, nzind] * self.w, axis=1) /\
-                       np.sum(self.w)
+        # dsum_jack = np.sum(self.data[3, :, nzind] * self.w,  axis=1) /\
+        #             np.sum(self.w)
+
+        dsum_jack = np.average(self.data[3, :, nzind], axis=1, weights=self.w)
+
+        # dsum_w_jack = np.sum(self.data[5, :, nzind] * self.w, axis=1) /\
+        #                np.sum(self.w)
+        dsum_w_jack = np.average(self.data[5, :, nzind], axis=1,
+                                 weights=self.w)
         self.dst0[nzind] = dsum_jack / dsum_w_jack
 
-        osum_jack = np.sum(self.data[4, :, nzind] * self.w, axis=1) /\
-                    np.sum(self.w)
-        osum_w_jack = np.sum(self.data[6, :, nzind] * self.w, axis=1) /\
-                       np.sum(self.w)
+        # osum_jack = np.sum(self.data[4, :, nzind] * self.w, axis=1) /\
+        #             np.sum(self.w)
+        osum_jack = np.average(self.data[4, :, nzind], axis=1, weights=self.w)
+        # osum_w_jack = np.sum(self.data[6, :, nzind] * self.w, axis=1) /\
+        #                np.sum(self.w)
+        osum_w_jack = np.average(self.data[6, :, nzind], axis=1,
+                                 weights=self.w)
         self.dsx0[nzind] = osum_jack / osum_w_jack
 
+    # THIS takes a lot of resources
     def _subprofiles(self):
         """Calculates subprofiles for each patch"""
 
@@ -273,20 +285,18 @@ class StackedProfileContainer(object):
             ind = self.indexes[i]
             cind = hasval[i]
 
+            wsum = np.sum(self.w[ind])
+
             dsum_jack = np.sum(self.data[3, ind][:, cind] *
-                               self.w[ind, np.newaxis], axis=0) /\
-                        np.sum(self.w[ind])
+                               self.w[ind, np.newaxis], axis=0) / wsum
             dsum_w_jack = np.sum(self.data[5, ind][:, cind] *
-                                  self.w[ind, np.newaxis], axis=0) /\
-                           np.sum(self.w[ind])
+                                  self.w[ind, np.newaxis], axis=0) / wsum
             self.dst_sub[cind, lab] = dsum_jack / dsum_w_jack
 
             osum_jack = np.sum(self.data[4, ind][:, cind] *
-                               self.w[ind, np.newaxis], axis=0) /\
-                        np.sum(self.w[ind])
+                               self.w[ind, np.newaxis], axis=0) / wsum
             osum_w_jack = np.sum(self.data[6, ind][:, cind] *
-                                  self.w[ind, np.newaxis], axis=0) /\
-                           np.sum(self.w[ind])
+                                  self.w[ind, np.newaxis], axis=0) / wsum
             self.dsx_sub[cind, lab] = osum_jack / osum_w_jack
 
     def _profcalc(self):

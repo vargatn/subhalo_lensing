@@ -8,7 +8,7 @@ import scipy.stats as stats
 
 
 def contprep(data, sample=1e4, **kwargs):
-    if sample is not None and sample > len(data):
+    if sample is not None and sample < len(data):
         subsample = data[np.random.choice(np.arange(len(data)), int(sample)), :]
     else:
         subsample = data
@@ -140,7 +140,8 @@ def kde_smoother_2d(pararr, xlim=None, ylim=None, num=100, pad=0.1):
 
 
 def corner(pars, par_list, par_edges, figsize=(8, 8), color='black', fig=None,
-           axarr=None, mode="hist", cmap="gray_r", normed=True, **kwargs):
+           axarr=None, mode="hist", cmap="gray_r", normed=True, fontsize=12,
+           **kwargs):
     npars = len(pars)
     if fig is None and axarr is None:
         fig, axarr = plt.subplots(nrows=npars, ncols=npars, sharex=False,
@@ -158,8 +159,10 @@ def corner(pars, par_list, par_edges, figsize=(8, 8), color='black', fig=None,
          for i, axrow in enumerate(axarr[:, :]) ]
 
         # Adding the distribution of parameters
-        [ax.set_xlabel(par) for (ax, par) in zip(axarr[-1, :], pars)]
-        [ax.set_ylabel(par) for (ax, par) in zip(axarr[1:, 0], pars[1:])]
+        [ax.set_xlabel(par, fontsize=fontsize)
+         for (ax, par) in zip(axarr[-1, :], pars)]
+        [ax.set_ylabel(par, fontsize=fontsize)
+         for (ax, par) in zip(axarr[1:, 0], pars[1:])]
 
         [ax.tick_params(labelsize=8) for ax in axarr.flatten()]
 
@@ -185,16 +188,10 @@ def corner(pars, par_list, par_edges, figsize=(8, 8), color='black', fig=None,
                 ylim = (par_edges[i + 1][0], par_edges[i + 1][-1])
                 # print(params.shape)
                 allgrid, tba = contprep(params, xlim=xlim ,ylim=ylim, **kwargs)
-                print(tba)
+                # print(tba)
                 ax.contour(allgrid[0], allgrid[1], allgrid[2],
                            levels=tba, colors=color)
-                # counts, xbins, ybins = np.histogram2d(par_list[j],
-                #                                       par_list[i+1],
-                #                                       bins=(par_edges[j],
-                #                                             par_edges[i+1]),
-                #                                       normed=normed)
-                # ax.contour(counts.T, extent=[xbins.min(), xbins.max(),
-                #                              ybins.min(), ybins.max()],
-                #            linewidths=2, colors=color)
+                ax.contourf(allgrid[0], allgrid[1], allgrid[2],
+                           levels=[tba[1], np.inf], colors=color, alpha=0.7)
 
     return fig, axarr
