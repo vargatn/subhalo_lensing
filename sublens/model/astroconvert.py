@@ -98,43 +98,6 @@ def fabrice_mlum_scaleing(rlum, h=1.0):
     return value
 
 
-class ConvertorBase(object):
-    def __init__(self):
-        self.requires = []
-        self.provides = []
-
-        self.pivots0 = {}
-        self.pivots = {}
-
-        self.exponents = {}
-        self.exponents0 = {}
-
-    def _get_indices(self, parnames):
-        indices = np.arange(len(self.requires))
-        if parnames is not None:
-            indices = np.array([np.where(req == np.array(parnames))[0][0]
-                                for req in self.requires])
-        if len(set(indices)) != len(indices):
-            raise NameError("duplicate parameter name specified!")
-
-        return indices
-
-    def convert(self, ftab):
-        raise NotImplementedError
-
-    def update(self, **kwargs):
-        pivots = {}
-        for k in set(self.pivots0.keys()).intersection(set(kwargs.keys())):
-            self.pivots.update({k: kwargs[k]})
-        exponents = {}
-        for k in set(self.exponents0.keys()).intersection(set(kwargs.keys())):
-                self.exponents.update({k: kwargs[k]})
-
-    def reset(self, *args, **kwargs):
-        self.pivots = self.pivots0.copy()
-        self.exponents = self.exponents0.copy()
-
-
 def cscale_duffy(m200=0.0, z=0.0, **kwargs):
     """
     Calculates NFW concentration based on M200 and redshift
@@ -152,12 +115,65 @@ def cscale_duffy(m200=0.0, z=0.0, **kwargs):
     return c
 
 
-# TODO documentation!!!
+class ConvertorBase(object):
+    """parent class for parameter conversions"""
+    def __init__(self):
+        """
+        Converts the specified parameter names and the specified data table
+        into an other sert of physical parameters
+
+        This is just the bas class, does not do anything
+        """
+        self.requires = []
+        self.provides = []
+
+        self.pivots0 = {}
+        self.pivots = {}
+
+        self.exponents = {}
+        self.exponents0 = {}
+
+    def _get_indices(self, parnames):
+        """Gets indices for the data table, based on paramneter names"""
+        indices = np.arange(len(self.requires))
+        if parnames is not None:
+            indices = np.array([np.where(req == np.array(parnames))[0][0]
+                                for req in self.requires])
+        if len(set(indices)) != len(indices):
+            raise NameError("duplicate parameter name specified!")
+
+        return indices
+
+    def convert(self, ftab):
+        raise NotImplementedError
+
+    def update(self, **kwargs):
+        """Updates the meta-parameters (exponents) which are used
+         for the conversion"""
+        pivots = {}
+        for k in set(self.pivots0.keys()).intersection(set(kwargs.keys())):
+            self.pivots.update({k: kwargs[k]})
+        exponents = {}
+        for k in set(self.exponents0.keys()).intersection(set(kwargs.keys())):
+                self.exponents.update({k: kwargs[k]})
+
+    def reset(self, *args, **kwargs):
+        """resets meta-parameters and exponents to default"""
+        self.pivots = self.pivots0.copy()
+        self.exponents = self.exponents0.copy()
+
+
 class DuffyCScale(ConvertorBase):
     def __init__(self):
         """
         Calculates NFW concentration based on M200 and redshift following
          Duffy et al. 2008
+
+        requires:
+            m200c, z
+
+        provides:
+            c200c
         """
         super().__init__()
         self.requires = sorted(['m200c', 'z'])
@@ -169,7 +185,15 @@ class DuffyCScale(ConvertorBase):
         self.c200 = -0.44
 
     def convert(self, ftab, parnames=None):
+        """
+        Performs conversion
 
+        :param ftab: np 2D array containing the  parameters, must be sorted if
+            parnames are not specified
+        :param parnames: list of parameter names for each column of the input
+                ftab table
+        :return: np.array of c200c values
+        """
         indices = self._get_indices(parnames)
 
         marr = ftab[:, indices[0]]
@@ -182,6 +206,15 @@ class DuffyCScale(ConvertorBase):
 
 class SimpleSubhaloMapper(ConvertorBase):
     def __init__(self):
+        """
+        Conversion tool for subhalo paramteres
+
+        requires:
+            'dist', 'rlum', 'z'
+
+        provides:
+            'c200c', 'm200c', 'z'
+        """
         super().__init__()
 
         self.requires = sorted(['dist', 'rlum', 'z'])
@@ -228,6 +261,15 @@ class SimpleSubhaloMapper(ConvertorBase):
 
 class SimpleParentMapper(ConvertorBase):
     def __init__(self):
+        """
+        Conversion tool for subhalo paramteres
+
+        requires:
+            'dist', 'lamb', 'z'
+
+        provides:
+            'dist', 'm200c', 'z'
+        """
         super().__init__()
 
         self.requires = sorted(['dist', 'lamb', 'z'])
