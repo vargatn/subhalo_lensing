@@ -198,20 +198,6 @@ class OffsetNFWProfile(DeltaSigmaProfile):
     def single_rbin_ds(self, r0, r1, *args, **kwargs):
         return oc_nfw_ring(r0, r1, **self.pardict)
 
-
-# FIXME this is a priority 1 task
-class SubhaloProfile(DeltaSigmaProfile):
-    def __init__(self):
-        super().__init__()
-
-
-# FIXME this is a priority 1 task
-class ParenthaloPofile(DeltaSigmaProfile):
-    def __init__(self):
-        super().__init__()
-
-# -----------------------------------------------------------------------------
-
 # -----------------------------------------------------------------------------
 
 class CorrelatedMatterProfile(DeltaSigmaProfile):
@@ -239,16 +225,5 @@ class CorrelatedMatterProfile(DeltaSigmaProfile):
     def rbin_deltasigma(self, redges, *args, **kwargs):
         raise NotImplementedError
 
-
-# TODO This is similar to the above, but with off-centering added
-class OffsetCorrelatedMatterProfile(DeltaSigmaProfile):
-    def __init__(self):
-        super().__init__()
-
-
-# TODO this is for the cluster BCG...
-class SingularProfile(DeltaSigmaProfile):
-    def __init__(self):
-        super().__init__()
 
 

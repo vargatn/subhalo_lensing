@@ -76,7 +76,6 @@ def nfw_params(cosmo, z, m200c, c200c, mlog10=True, *args, **kwargs):
 
 
 def lm200_rykoff_orig(l, **kwargs):
-    # FIXME this is a throwaway function
     """
     Matches redmapper richness to cluster m200
 
@@ -90,7 +89,6 @@ def lm200_rykoff_orig(l, **kwargs):
 
 
 def fabrice_mlum_scaleing(rlum, h=1.0):
-    # FIXME this is a throwaway function
     """Some rough scaling for r band galaxy mass..."""
     Lpivot = 1.6e10 / h**2.
     Mpivot = 18.6e11 / h

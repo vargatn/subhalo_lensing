@@ -6,8 +6,6 @@ import numpy as np
 
 from .profiles import SimpleNFWProfile
 
-# TODO implement this module
-
 
 class LikelihoodBase(object):
     def __init__(self, *args, **kwargs):
