@@ -4,7 +4,6 @@ Spherical transformations and 3D rotations
 
 import numpy as np
 
-
 def gcdist(pa, pb, mode='simple', deg=True):
     """
     Great circle distance

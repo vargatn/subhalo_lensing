@@ -175,8 +175,11 @@ class AbsMagConverter(object):
         Calculates K-correction from band --> band
 
         :param z: redshift (or iterable)
+
         :param band: One of the available bands
+
         :param z2: observer's redshift
+
         :return: kval korrection value or array
         """
         # creating template function
@@ -213,8 +216,11 @@ class AbsMagConverter(object):
         Gets x edges where yy is larger than ralim-th of the full amplitude
 
         :param xx: x-values
+
         :param yy: y-values
+
         :param ralim: relative amplitude limit
+
         :return: (x0, x1)
         """
         yresc = yy / np.max(yy)
@@ -229,8 +235,11 @@ class AbsMagConverter(object):
         Argument in Frame at redshift z
 
         :param ll: wavelength [nm]
+
         :param ftempl: emitter SED function
+
         :param fresp: detector response function
+
         :param z: redshift
         """
         val =  ll * ftempl(ll / (1. + z)) * fresp(ll * (1. + z2))
@@ -249,7 +258,9 @@ class AbsMagConverter(object):
         Calculates a lookup table for quick calculations
 
         :param zarr: specifiedz values
+
         :param band: name of the band
+
         :param z2: observer redshift
         """
         dmod = self.dist_modulus(zarr)
@@ -283,16 +294,23 @@ class AbsMagConverter(object):
         Converts apparent magnitudes to absolute
 
         :param mag: Observed magnitudes
+
         :param z: redsift of objects
+
         :param band: name of band (string)
+
         :param z2: redshift of observed
+
         :param use_tables: Try to use pre calculated table for the band
 
 
         # for auto z array
         :param num: number of points in reference tables
+
         :param z_0: start of redshift table
+
         :param z_1: end of redshift table
+
 
         :return: absolute magnitudes
         """
@@ -320,6 +338,7 @@ class AbsMagConverter(object):
         then assemble this to a dict with other relevant info
 
         :param zarr: z values to use
+
         :param z2: observer redshift
         """
 

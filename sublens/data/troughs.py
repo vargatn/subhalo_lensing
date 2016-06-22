@@ -3,12 +3,7 @@ Shear calculation with troughs
 """
 
 import numpy as np
-import math
-
 import healpy as hp
-from astropy.io import fits
-
-import pickle
 
 
 class TroughHandler(object):
@@ -20,14 +15,11 @@ class TroughHandler(object):
 
         parameters:
         ------------------
-        * trough_names:
-            list of the paths to trough map fits files
+        :param trough_names: list of the paths to trough map fits files
 
-        * zrange:
-            tuple of the redshift range spanned by the troughs
+        :param zrange: tuple of the redshift range spanned by the troughs
 
-        * tradius:
-            the selection radius of the troughs in *radians*
+        :param tradius: the selection radius of the troughs in *radians*
         """
         self.names = trough_names
         self.zrange = zrange
@@ -88,11 +80,13 @@ class TroughHandler(object):
 
         parameters:
         --------------
-        * ovec:
-            list or array of 3D unit vectors (directions) for each object
+        :param ovec: list or array of 3D unit vectors (directions)
+                     for each object
 
-        * sradius:
-            search radius for the trough selection, if None uses trough radius
+        :param sradius: search radius for the trough selection,
+                        if None uses trough radius
+
+        :returns: array of summed weights for each object
         """
         if sradius is None:
             self._get_environments(ovec, self.tradius)
@@ -122,17 +116,13 @@ class ClusterFormatter(object):
 
         parameters:
         --------------
-        * cvec:
-            3D coordinate vectors of clusters on the unit sphere
+        :param cvec: 3D coordinate vectors of clusters on the unit sphere
 
-        * cra:
-            RA list for clusters
+        :param cra: RA list for clusters
 
-        * cdec:
-            DEC list for clusters
+        :param cdec: DEC list for clusters
 
-        * czz:
-            redshift list for clusters
+        :param czz: redshift list for clusters
         """
         self.cvec = cvec
         self.cra = cra
@@ -148,9 +138,8 @@ class ClusterFormatter(object):
 
         parameters:
         -------------
-        * cvlens:
-            list containing the # of troughs within the search radius of
-             each cluster
+        :param cvlens: list containing the # of troughs within the
+                       search radius of each cluster
         """
         self.cvlens = cvlens
 
@@ -169,9 +158,10 @@ class ClusterFormatter(object):
 
         parameters:
         -------------
-        * cvlens:
-            list containing the # of troughs within the search radius of
-             each cluster
+        :param cvlens: list containing the # of troughs within the
+                       search radius of each cluster
+
+        :returns: indices for the corresponding entries in the matched array
         """
         self._get_cinds(cvlens)
         self.craa = [self.cra[cind] for cind in self.cinds]
@@ -207,11 +197,9 @@ class TroughFormatter(object):
 
         parameters:
         -------------
-        * th:
-            TroughHandler instance
+        :param th: TroughHandler instance
 
-        * ovics:
-            vicinities for each cluster to be considered
+        :param ovics: vicinities for each cluster to be considered
         """
         self.th = th
         self.ovics = ovics
