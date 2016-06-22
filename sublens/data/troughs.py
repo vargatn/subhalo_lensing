@@ -116,7 +116,7 @@ class TroughHandler(object):
 class ClusterFormatter(object):
     """Creates a cluster position table with matched size"""
 
-    def __init__(self, cvec, cra, cdec, czz):
+    def __init__(self, cvec, cra, cdec, cz):
         """
         Creates a table which a row for each cluster trough pair
 
