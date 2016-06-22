@@ -12,9 +12,8 @@ setup(name="sublens",
                           "matplotlib>=1.5",
                           "hankel",
                           "kmeans_radec",
-                          "cython>=.0.24"],
+                          "cython>=0.23"],
 
       author="Tamas Norbert Varga",
       author_email="vargat@gmail.com",
       version="0.1")
-

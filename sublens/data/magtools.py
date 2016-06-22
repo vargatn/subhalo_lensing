@@ -12,6 +12,11 @@ import scipy.integrate as integr
 
 class Luminosity(object):
     def __init__(self):
+        """
+        Simple magnitude to flux conversion
+
+        L_sun can be specified for multiple bands, default is SDSS r-band
+        """
         self.survey = "mock-DES (SDSS)"
         self.msol = {
             "r": 4.52,
@@ -38,6 +43,47 @@ class AbsMagConverter(object):
         Apparent to Absolute magnitude conversion
 
         Uses distance modulus + k-correction with single template
+
+
+        Example usage:
+        -----------------------------
+
+        # without saving lookup table
+
+        # response function of the survey
+        resp = {
+            "survey": "DES",  # name string for survey
+            "lambda": lambda_array,  # array of wavelength values
+            "lambda unit": "nm"  #  this must be the same for the response and
+                                 #  the template
+            "bands": bands #  dictionary of band name, response array pairs
+                           #  bands = {"r": r_arr, "g": g_arr}
+        }
+
+        # template spectra for the conversion
+        templ = {
+            "type = "red quiescent",
+            "lambda": lambda_array,  # array of wavelength values
+            "lambda unit": "nm",  #  this must be the same for the response and
+                                  #  the template
+            "sed": sed,  # Values corresponding to the lambda values
+            "sed unit": "Normalized Flux" # this is OK as long as the norm flag
+                                          # is on when specifying the template
+        }
+
+        aconv = AbsMagConverter(cosmo=astropy.FlatLambdaCDM(H0=70, Om0=0.3))
+        aconv.add_response(resp)
+        aconv.add_template(templ, norm=True)
+
+        # here mag is the set of apparent magnitudes, and z is the redshift
+        # of each object. band is the string name of the band, like "r"
+        absmag = aconv.convert(self, mag, z, band, z2=0.0, num=100,
+                               z_0='auto', z_1='auto', use_tables=False)
+
+        # after the conversion is complete we can save the used lookup table
+        # for later use with a pickle!
+
+        aconv.save_tables("mytable.p")
 
         :param cosmo: FlatLambdaCDM (default: H0=70, Om0=0.3)
         """
