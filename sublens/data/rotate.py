@@ -2,61 +2,77 @@
 Spherical transformations and 3D rotations
 """
 
+import healpy as hp
 import numpy as np
 
-def gcdist(pa, pb, mode='simple', deg=True):
+
+def caparea(theta):
+    """Area of a spherical cap (radians)"""
+    val = 2. * np.pi * (1. - np.cos(theta))
+    return val
+
+def rotate(vv, kk, angles):
+    """
+    Rotation on a sphere unit with vectors using the exact formula
+
+    parameters:
+    -------------
+    :param vv: position to be rotated
+
+    :param kk: center for rotation
+
+    :param angles: angle for rotation in *radians*
+
+    :returns: rotated vectors
+    """
+    term1 = vv * np.cos(angles[:, np.newaxis])
+    term2 = np.cross(kk, vv, axis=1) * np.sin(angles[:, np.newaxis])
+    term3 = kk * np.array([np.inner(k, v) for k, v in zip(kk, vv)]
+                          )[:, np.newaxis] *\
+            (1. - np.cos(angles[:, np.newaxis]))
+    return term1 + term2 + term3
+
+
+def gcdist(pa, pb, mode='precise', deg=True):
     """
     Great circle distance
 
+    NOTE: there is no reason to use anything other than "precise"...
+
     :param pa: coordinates N x (RA, DEC)
+
     :param pb: coordinates N x (RA, DEC)
+
     :param mode: calculatinon formula (may affect precision)
+
     :param deg: True: degrees, false: radians
+
     :return: array of distances
     """
 
-    if deg:
-        pa = np.array(pa, copy=True, dtype='float64') * np.pi / 180.
-        pb = np.array(pb, copy=True, dtype='float64') * np.pi / 180.
-
     if mode == 'simple':
-        val = _sphere_dist(pa, pb)
+        val = _sphere_dist(pa, pb, deg=deg)
+    elif mode == 'precise':
+        val = hp.rotator.angdist(pa, pb, lonlat=True)
     else:
         raise NotImplementedError
-
-    if deg:
-        val *= 180. / np.pi
 
     return val
 
 
-def _sphere_dist(pa, pb):
+def _sphere_dist(pa, pb, deg=True):
     """Simple great circle dist in RADIANS"""
-    dl = np.abs(pa[:, 0] - pb[:, 0])
-    dsigm = np.arccos(np.sin(pa[:, 1]) * np.sin(pb[:, 1]) + np.cos(pa[:, 1]) * np.cos(pb[:, 1]) * np.cos(dl))
-    return dsigm
-
-
-def rotmatr(angle, axis_vector, deg=True):
-    """
-    3D rotation matrix around specified axis_vector
-
-    :param angle: angle
-    :param axis_vector: normal vector
-    :param deg: if True use degrees, else radians
-    :return: Rotation matrix
-    """
-
     if deg:
-        angle *= np.pi / 180.
+        pa = np.array(pa, copy=True, dtype='float64') * np.pi / 180.
+        pb = np.array(pb, copy=True, dtype='float64') * np.pi / 180.
 
-    u = axis_vector / np.sqrt(np.sum(axis_vector ** 2.))
-    ux = np.array([[0., -u[2], u[1]], [u[2], 0., -u[0]], [-u[1], u[0], 0]])
-    udot = np.outer(u, u)
-    R = np.eye(3) * np.cos(angle)  + np.sin(angle) * ux +\
-        (1. - np.cos(angle)) * udot
+    dl = np.abs(pa[:, 0] - pb[:, 0])
+    dsigm = np.arccos(np.sin(pa[:, 1]) * np.sin(pb[:, 1]) +
+                      np.cos(pa[:, 1]) * np.cos(pb[:, 1]) * np.cos(dl))
+    if deg:
+        dsigm *= 180. / np.pi
 
-    return np.matrix(R)
+    return dsigm
 
 
 def spher2cart(spher, deg=True):
@@ -86,25 +102,3 @@ def cart2spher(cart, deg=True):
     if deg:
         spher  *= 180. / np.pi
     return spher
-
-
-def rot_center(rd, cent, angle=180., deg=True):
-    """
-    Rotates the rd point around the axis defined by the coordinate pair cent
-
-    :param rd: point pair (RA, DEC)
-    :param cent:rotation center (RA, DEC)
-    :return: rotated position (RA, DEC)
-    """
-
-    rax = spher2cart(cent)
-    rax_angle = -angle
-    Rot = rotmatr(rax_angle, rax, deg=deg)
-
-    cart = spher2cart(rd)
-    cart = np.expand_dims(cart, axis=1)
-
-    res_rot = np.array(np.dot(Rot, np.matrix(cart))).transpose((1, 0)).T
-    new_rd = cart2spher(res_rot[:, 0], deg=deg)
-    return new_rd
-
