@@ -1,5 +1,5 @@
 """
-Default cosmology and cosmobuild
+Default cosmology and cosmology params
 """
 
 from astropy.cosmology import FlatLambdaCDM

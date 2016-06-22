@@ -1,5 +1,5 @@
 """
-Wrapper for xshear
+Wrapper for xshear and xshear output
 """
 
 
@@ -14,7 +14,9 @@ def tonpy(fname, force=False, **kwargs):
     Converts text file to npy format
 
     :param fname: dat file to convert
+
     :param force: force overwriting existing npy file
+
     :return: True if writing has happened, False if didn't
     """
     # getting extension
@@ -39,6 +41,7 @@ def xconv(dname, force=False):
     Converts xshear text datafiles to npy binary
 
     :param dname: path of dictionary log
+
     :param force: force overwrite existing result
     """
 
@@ -62,7 +65,9 @@ def fread(fname, mode='auto', **kwargs):
     auto: tries dat and then npy
 
     :param fname: file name string
+
     :param mode: switch between modes
+
     :return: data table as numpy array
     """
 
@@ -91,7 +96,12 @@ def xread(fname, fmode="dat", xmode='reduced', **kwargs):
     (This is the file where the output is piped, e.g.: lens_res.dat)
 
     :param fname: file name
-    :param mode: switches between ascii and npy table
+
+    :param fmode: switches between ascii and npy table
+
+    :param xmode: switches different output file formats:
+                  point, reduced, sample
+
     :return: info, data, valnames
     """
 
@@ -125,7 +135,10 @@ def xhandler(xdata, xmode='reduced', **kwargs):
     osensum_i:  sum of weights times sensitivities
 
     :param xdata: xshear data file
-    :param
+
+    :param xmode: switches different output file formats:
+                  point, reduced, sample
+
     :returns: info, data, valnames
     """
 
@@ -179,7 +192,6 @@ def xsample(xdata, **kwargs):
     assert (info[:, 2] == np.sum(data[0, :, :], axis=1)).all()
 
     return info, data, valnames
-
 
 
 def xreduced(xdata, **kwargs):
@@ -289,15 +301,25 @@ class WrapX(object):
         -----------------------------------------------------------------------
 
         :param doc: documentation string (detailed)
+
         :param name: name (short) of the current setup
+
         :param source_path: path of the source catalog
+
         :param xshear_path: path of the xshear executable
+
         :param h0: Hubble constant base at z=0 (defines h or h_70 etc...)
+
         :param omega_m: matter density parameter at z=0
+
         :param healpix_nside: number of healpix cells to use along a side
+
         :param nbin: number of logarithmic radial bins
+
         :param rmin: innermost radial bin edge
+
         :param rmax: outermost radial bin edge
+
         :param zlvals: used redshift values (array/list)
         """
 

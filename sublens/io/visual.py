@@ -8,6 +8,16 @@ import scipy.stats as stats
 
 
 def contprep(data, sample=1e4, **kwargs):
+    """
+    Prepares contours based on passsed dataset
+
+    :param data: dataset to use
+
+    :param sample: if smaller than size of data, use this many random samples]
+     from it (without replacement instead
+
+    :returns: (xx, yy, kk), (level95, level68)
+    """
     if sample is not None and sample < len(data):
         subsample = data[np.random.choice(np.arange(len(data)), int(sample)), :]
     else:
@@ -27,9 +37,13 @@ def conf1d(pval, grid, vals, res=200, etol=1e-3, **kwargs):
     Requires evenly spaced grid!
 
     :param pval: percentile
+
     :param grid: parameter
+
     :param vals: value of the p.d.f at given gridpoint
+
     :param res: resolution of the percentile search
+
     :return: cutoff value, actual percentile
     """
 
@@ -52,10 +66,15 @@ def conf2d(pval, xxg, yyg, vals, res=200, etol=1e-3, **kwargs):
     Calculates cutoff values for a given percentile for 2D distribution
 
     :param pval: percentile
+
     :param xxg: grid for the first parameter
+
     :param yyg: grid for the second parameter
+
     :param vals: value of the p.d.f at given gridpoint
+
     :param res: resolution of the percentile search
+
     :return: cutoff value, actual percentile
     """
     edge1 = xxg[0, :]
@@ -79,8 +98,11 @@ def kde_smoother_1d(pararr, xlim=None, num=100, pad=0):
     Creates a smoothed histogram from 1D scattered data
 
     :param pararr: list of parameters shape (Npoint, Npar)
+
     :param xlim: x range of the grid
+
     :param num: number of gridpoints on each axis
+
     :return: xgrid, values for each point
     """
     # creating smoothing function
@@ -107,9 +129,13 @@ def kde_smoother_2d(pararr, xlim=None, ylim=None, num=100, pad=0.1):
     Creates a smoothed histogram from 2D scattered data
 
     :param pararr: list of parameters shape (Npoint, Npar)
+
     :param xlim: x range of the grid
+
     :param ylim: y range of the grid
+
     :param num: number of gridpoints on each axis
+
     :return: xgrid, ygrid, values for each point
     """
     # creating smoothing function
@@ -142,6 +168,41 @@ def kde_smoother_2d(pararr, xlim=None, ylim=None, num=100, pad=0.1):
 def corner(pars, par_list, par_edges, figsize=(8, 8), color='black', fig=None,
            axarr=None, mode="hist", cmap="gray_r", normed=True, fontsize=12,
            **kwargs):
+    """
+    Creates *NICE* corner plot
+
+    NOTE: currently the axis ticks may overlap...
+
+    :param pars: name of parameters to display
+
+    :param par_list: list of parameter arrays: the DATA to show
+
+    :param par_edges: bin edges for each parameter
+
+    :param figsize: figure size
+
+    :param color: color to use for the drawn curves (or contours)
+
+    :param fig: if specified does not create new but adds everything to this
+                    use for multiple overlayed curves
+
+    :param axarr: if specified does not create new but adds everything to this
+                    use for multiple overlayed curves
+
+    :param mode: histogram, or contour. contours are Kernel smoothed and show
+                    the 95 and 68 percent confidence regions with the inner
+                     ones shaded
+
+    :param cmap: string name of color map to use in histogram mode
+
+    :param normed: wether to norm histogram data
+
+    :param fontsize: for the axis labels
+
+    :param kwargs: additional kezword arguments
+
+    :return: fig, axarr
+    """
     npars = len(pars)
     if fig is None and axarr is None:
         fig, axarr = plt.subplots(nrows=npars, ncols=npars, sharex=False,
