@@ -503,9 +503,9 @@ def stacked_pcov(plist):
 
     # building up the covariance matrix
     for i1 in range(dlen):
-        p1 = i1 // rlen  # the pth profile
+        p1 = i1 // rlen  # the p-th profile
         pc1 = plist[p1]
-        r1 = i1 % rlen  # the rth radial bin within the pth profile
+        r1 = i1 % rlen  # the r-th radial bin within the p-th profile
         for i2 in range(dlen):
             p2 = i2 // rlen
             pc2 = plist[p2]
