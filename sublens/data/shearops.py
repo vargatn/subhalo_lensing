@@ -19,12 +19,18 @@ def _get_nbin(data):
 def redges(rmin, rmax, nbin):
     """
     Calculates nominal edges and centers for logarithmic bins
-
     (base10 logarithm is used)
 
+    Edges and areas are exact, "center" values are estimated assuming a
+    uniform source surface density. That is it gives the CIRCUMFERENCE weighted
+    radius...
+
     :param rmin: inner edge
+
     :param rmax: outer edge
+
     :param nbin: number of bins
+
     :returns: centers, edges, areas
 
     """
@@ -47,13 +53,21 @@ class RawProfileContainer(object):
         Shear data file handling for raw profiles
 
         :param data: data table from xshear output
+
         :param info: info table from xshear output
+
         :param ra: RA coordinate of lens cat (np.array)
+
         :param dec: DEC coordinate of lens cat (np.array)
+
         :param cat: Catalog containing lens parameters (recordarray like)
+
         :param nbin: number of logarithmic bins
+
         :param rmin: innermost bin edge
+
         :param rmax: outermost bin edge
+
         :param lcname: lens catalog string description
         """
 
@@ -79,6 +93,7 @@ class RawProfileContainer(object):
         Loads raw profile data based on xshear log pickle
 
         :param fname: log pickle file
+
         :param cat: Catalog
         """
 
@@ -98,6 +113,7 @@ class RawProfileContainer(object):
         Shrinks dataset to index selection, (default is copy!)
 
         :param ind: array of indices to use
+
         :returns: instance of RawProfileContainer
         """
         if ind is None:
@@ -115,12 +131,22 @@ class StackedProfileContainer(object):
         """
         Container for Stacked profile
 
+        NOTE: the calculation right now is quite slow, the bottleneck seems to
+        be in the repeated indexing -- slicing of arrays in the _subprofiles
+        function!!!
+
         :param info: first part of xshear outfile
+
         :param data: second part of xshear outfile
+
         :param pos: (RA, DEC) in degree
+
         :param nbin: number of logarithmic bins
+
         :param rmin: innermost bin edge
+
         :param rmax: outermost bin edge
+
         :param lcname: lens catalog string description
         """
 
@@ -199,6 +225,7 @@ class StackedProfileContainer(object):
         Obtains JK subpatches using a spherical k-means algorithm (from Erin)
 
         :param centers: JK center coordinates (RA, DEC) or numbers
+
         :param verbose: passed to kmeans radec
         """
 
@@ -249,23 +276,12 @@ class StackedProfileContainer(object):
         self.rr[nzind] = np.sum(self.data[1, :, nzind], axis=1) /\
                   np.sum(self.data[2, :, nzind], axis=1)
 
-        # calculating combined profiles
-        # dsum_jack = np.sum(self.data[3, :, nzind] * self.w,  axis=1) /\
-        #             np.sum(self.w)
-
         dsum_jack = np.average(self.data[3, :, nzind], axis=1, weights=self.w)
-
-        # dsum_w_jack = np.sum(self.data[5, :, nzind] * self.w, axis=1) /\
-        #                np.sum(self.w)
         dsum_w_jack = np.average(self.data[5, :, nzind], axis=1,
                                  weights=self.w)
         self.dst0[nzind] = dsum_jack / dsum_w_jack
 
-        # osum_jack = np.sum(self.data[4, :, nzind] * self.w, axis=1) /\
-        #             np.sum(self.w)
         osum_jack = np.average(self.data[4, :, nzind], axis=1, weights=self.w)
-        # osum_w_jack = np.sum(self.data[6, :, nzind] * self.w, axis=1) /\
-        #                np.sum(self.w)
         osum_w_jack = np.average(self.data[6, :, nzind], axis=1,
                                  weights=self.w)
         self.dsx0[nzind] = osum_jack / osum_w_jack
@@ -347,6 +363,7 @@ class StackedProfileContainer(object):
         Calculates the Jackknife estimate of the stacked profile
 
         :param centers: JK centers (number or list)
+
         :param weights: weight for each entry in the datafile
         """
 
@@ -369,8 +386,16 @@ class StackedProfileContainer(object):
         self.neff = self._get_neff()
         self.hasprofile = True
 
-    def _diff_subprofiles(self, other):
-        """Calculates subprofiles of the difference"""
+    def _composite_subprofiles(self, other, operation="-"):
+        """
+        Applies the binary operation to the profile objects
+
+
+        :param other: other instance of the StackedProfileContainer class
+
+        :param operation: "+" or "-"
+        """
+
         tmp_dst_sub = np.zeros(shape=(self.nbin, self.ncen))
         tmp_dsx_sub = np.zeros(shape=(self.nbin, self.ncen))
 
@@ -393,10 +418,18 @@ class StackedProfileContainer(object):
 
             njk = len(subind)
             if njk > 1:
-                tmp_dst_sub[r, subind] = self.dst_sub[r, subind] - \
-                                         other.dst_sub[r, subind]
-                tmp_dsx_sub[r, subind] = self.dsx_sub[r, subind] - \
-                                         other.dsx_sub[r, subind]
+                if operation == "-":
+                    tmp_dst_sub[r, subind] = self.dst_sub[r, subind] -\
+                                             other.dst_sub[r, subind]
+                    tmp_dsx_sub[r, subind] = self.dsx_sub[r, subind] -\
+                                             other.dsx_sub[r, subind]
+                elif operation == "+":
+                    tmp_dst_sub[r, subind] = self.dst_sub[r, subind] +\
+                                             other.dst_sub[r, subind]
+                    tmp_dsx_sub[r, subind] = self.dsx_sub[r, subind] +\
+                                             other.dsx_sub[r, subind]
+                else:
+                    raise ValueError("Operation not supported, use '+' or '-'")
 
         # assigning updated containers
         self.sub_labels = tmp_sub_labels
@@ -404,18 +437,21 @@ class StackedProfileContainer(object):
         self.dst_sub = tmp_dst_sub
         self.dsx_sub = tmp_dsx_sub
 
-    def subtract(self, other):
+    def composite(self, other, operation="-"):
         """
-        Calculate the JK estimate on the difference of two profiles
+        Calculate the JK estimate on the operation applied to the two profiles
 
-        Operation:
-        --------------
-        self - other
+        Possible Operations:
+        --------------------
+        "-": self - other
+        "+": self + other
 
-        The resulting difference is updated to self. Use deepcopy to obtain
+        The results is updated to self. Use deepcopy to obtain
         copies of the object for storing the previous state.
 
         :param other: StackedProfileContainer instance
+
+        :param operation: string specifying what to do...
         """
 
         # making sure that there is a profile in both containers
@@ -424,7 +460,7 @@ class StackedProfileContainer(object):
         # making sure that the two profiles use the same centers
         err_msg = 'JK centers do not agree within 1e-5'
         np.testing.assert_allclose(self.centers, other.centers,
-                                          rtol=1e-5, err_msg=err_msg)
+                                   rtol=1e-5, err_msg=err_msg)
         assert self.dst_sub.shape == other.dst_sub.shape
 
         # clears the profile container
@@ -434,7 +470,7 @@ class StackedProfileContainer(object):
         self._get_rr()
 
         # updates subprofiles
-        self._diff_subprofiles(other)
+        self._composite_subprofiles(other=other, operation=operation)
         self._profcalc()
         self._covcalc()
 
@@ -446,6 +482,7 @@ def stacked_pcov(plist):
     Calculates the Covariance between a list of profiles
 
     :param plist: list of StackedProfileContainer objects
+
     :return: supercov_t, supercov_x matrices
     """
     # checking that input is of correct format
