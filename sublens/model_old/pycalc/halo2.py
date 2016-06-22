@@ -1,10 +1,14 @@
+"""
+2- Halo term formulas
+"""
+
 import scipy.interpolate as interp
 import numpy as np
 import hankel
 import astropy.units as u
 
 
-class W2calc(object):
+class H2calc(object):
     """Linear 2-halo term"""
     def __init__(self, z, spectra, cosmo, scalar_ind=0.96):
         """
@@ -14,8 +18,11 @@ class W2calc(object):
         \Delta\Sigma(r,z) = b * \int_0^\infty  dk  k / (2 p\i) J_2(r k) P(k, z)
 
         :param z: redshift
+
         :param spectra: linear matter power spectra, like the one from CAMB
+
         :param cosmo: astropy cosmology object
+
         :param scalar_ind: scalar index of the Power Spectrum
         """
         self.z = z
@@ -29,6 +36,7 @@ class W2calc(object):
         with the x-axis given in physical radii
 
         :param rr: physical scale (Mpc)
+
         :return: function
         """
         karr = self.spectra[:, 0]
@@ -64,6 +72,7 @@ class W2calc(object):
     def warr(self, rarr, nn=100, hh=0.03):
         """Vectorized Hankel integrator with the appropriate prefactors"""
         intres = np.array([self.wint(rr, nn=nn, hh=hh) for rr in rarr])
+
         prefac = self.cosmo.critical_density(self.z) *\
                  self.cosmo.Om(self.z)
         prefac = prefac.to(u.solMass/ u.Mpc**3)

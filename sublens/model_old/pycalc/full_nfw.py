@@ -15,9 +15,13 @@ def nfw_deltasigma(r, rs, rho_s, *args, **kwargs):
         Wright, Candace Oaxaca; Brainerd, Tereasa G.
         http://adsabs.harvard.edu/abs/2000ApJ...534...34W
 
+
     :param r: radius in physical units
+
     :param rs: scale radius in physical units
+
     :param rho_s: \rho_c * \delta_c
+
     :return: value of tangential shear at distance r
     """
 
@@ -48,14 +52,19 @@ def oc_intarg(phi, r, rs, rho_s, dist):
     """
     Argument expression for Integral
 
-    Offcenters the shear profile usig the fact that it is a spin-2 field
+    Off-centers the shear profile usig the fact that it is a spin-2 field
 
     :param phi: polar angle
+
     :param r: radius in physical units
+
     :param rs: scale radius in physical units
+
     :param rho_s: \rho_c * \delta_c
+
     :param dist: offset distance
-    :return: density
+
+    :return: tangential shear at point (phi, r)
     """
     assert r > 0.
     # creating transformation variables
