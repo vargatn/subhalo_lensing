@@ -7,7 +7,6 @@ import numpy as np
 import kmeans_radec as krd
 import pickle
 import os
-from multiprocessing import Pool
 
 from ..io import xread, fread
 

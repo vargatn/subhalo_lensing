@@ -1,6 +1,5 @@
 import scipy.interpolate as interp
 import numpy as np
-import math
 import hankel
 import astropy.units as u
 
