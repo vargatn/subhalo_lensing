@@ -33,15 +33,10 @@ class H2calc(object):
         self.pkfunc = self.finterp()
 
     def finterp(self):
-        # karr = self.spectra[0:-1:13, 0]
-        # parr = self.spectra[0:-1:13, 1]
-
+        """Interpolates the CAMB output power spectra into a callable func."""
         karr = self.spectra[:, 0]
         parr = self.spectra[:, 1]
-
         return interp.UnivariateSpline(karr, parr, s=0)
-        # return interp.interp1d(karr, parr, bounds_error=True, kind="linear",
-        #                        fill_value=np.nan)
 
     def fmaker(self, rr):
         """
