@@ -8,6 +8,18 @@ is a layer between what happens numerically and how it is interfaced with.
 import numpy as np
 
 from sublens.io import default_cosmo
+from ..model.astroconvert import nfw_params
+
+from ..model.cycalc import tnfw
+from ..model.cycalc import tnfw_ring
+
+from ..model.pycalc.full_nfw import nfw_deltasigma
+from ..model.pycalc.full_nfw import nfw_ring
+
+from ..model.pycalc.full_nfw import oc_nfw
+from ..model.pycalc.full_nfw import oc_nfw_ring
+
+from ..model.pycalc.halo2 import H2calc
 
 
 class DeltaSigmaProfile(object):
@@ -94,19 +106,24 @@ class DeltaSigmaProfile(object):
         else:
             raise ValueError('mode must be "rr" or "edges"')
 
- # TODO update with new conversion tool!
+
 class SimpleNFWProfile(DeltaSigmaProfile):
     """The conventional spherical NFW profile"""
     def __init__(self, cosmo=None):
         super().__init__(cosmo=cosmo)
         self.requires = sorted(['c200c', 'm200c', 'z'])
+        self._provides = ['clike', 'mlike']
+        self._requires = ['c200c', 'm200c']
 
     def __str__(self):
         return "SimpleNFWProfile"
 
     def prepare(self, **kwargs):
         assert set(self.requires) <= set(kwargs)
-        self.profpars, self.parnames = nfw_params(self.cosmo, **kwargs)
+        prov = dict(zip(self._provides, [kwargs.pop(key)
+                                         for key in self._requires]))
+        prov.update(kwargs)
+        self.profpars, self.parnames = nfw_params(self.cosmo, **prov)
         self.pardict = dict(zip(self.parnames, self.profpars))
         self._prepared = True
 
@@ -117,3 +134,115 @@ class SimpleNFWProfile(DeltaSigmaProfile):
         return nfw_ring(r0, r1, **self.pardict)
 
 
+class SimpleNFWProfile500(SimpleNFWProfile):
+    """The conventional spherical NFW profile"""
+    def __init__(self, cosmo=None):
+        super().__init__(cosmo=cosmo)
+        self.requires = sorted(['c500c', 'm500c', 'z'])
+        self._provides = ['clike', 'mlike']
+        self._requires = ['c500c', 'm500c']
+
+    def __str__(self):
+        return "SimpleNFWProfile500"
+
+    def prepare(self, **kwargs):
+        assert set(self.requires) <= set(kwargs)
+        prov = dict(zip(self._provides, [kwargs.pop(key)
+                                         for key in self._requires]))
+        prov.update(kwargs)
+        self.profpars, self.parnames = nfw_params(self.cosmo, delta=500,
+                                                  **prov)
+        self.pardict = dict(zip(self.parnames, self.profpars))
+        self._prepared = True
+
+
+class TruncatedNFWProfile(DeltaSigmaProfile):
+    """The NFW profile with a hard cutoff at rt"""
+    def __init__(self, cosmo=None):
+        super().__init__(cosmo=cosmo)
+        self.requires = sorted(['c200c', 'm200c', 'z', 'rt'])
+        self._provides = ['clike', 'mlike']
+        self._requires = ['c200c', 'm200c']
+
+    def __str__(self):
+        return "TruncatedNFWProfile"
+
+    def prepare(self, **kwargs):
+        assert set(self.requires) <= set(kwargs)
+        prov = dict(zip(self._provides, [kwargs.pop(key)
+                                         for key in self._requires]))
+        prov.update(kwargs)
+        self.profpars, self.parnames = nfw_params(self.cosmo, delta=500,
+                                                  **prov)
+        self.profpars += (kwargs["rt"],)
+        self.parnames += ("rt",)
+        self.pardict = dict(zip(self.parnames, self.profpars))
+        self._prepared = True
+
+    def point_ds(self, r, *args, **kwargs):
+        return tnfw(r, **self.pardict)
+
+    def single_rbin_ds(self, r0, r1, *args, **kwargs):
+        return tnfw_ring(r0, r1, **self.pardict)
+
+
+class OffsetNFWProfile(DeltaSigmaProfile):
+    """The NFW profile offset by dist"""
+    def __init__(self, cosmo=None):
+        super().__init__(cosmo=cosmo)
+        self.requires = sorted(['c200c', 'm200c', 'z', 'dist'])
+        self._provides = ['clike', 'mlike']
+        self._requires = ['c200c', 'm200c']
+
+    def __str__(self):
+        return "OffsetNFWProfile"
+
+    def prepare(self, **kwargs):
+        assert set(self.requires) <= set(kwargs)
+        prov = dict(zip(self._provides, [kwargs.pop(key)
+                                         for key in self._requires]))
+        prov.update(kwargs)
+        self.profpars, self.parnames = nfw_params(self.cosmo, delta=500,
+                                                  **prov)
+        self.profpars += (kwargs["dist"],)
+        self.parnames += ("dist",)
+        self.pardict = dict(zip(self.parnames, self.profpars))
+        self._prepared = True
+
+    def point_ds(self, r, *args, **kwargs):
+        return oc_nfw(r, **self.pardict)
+
+    def single_rbin_ds(self, r0, r1, *args, **kwargs):
+        return oc_nfw_ring(r0, r1, **self.pardict)
+
+# -----------------------------------------------------------------------------
+
+
+class CorrelatedMatterProfile(DeltaSigmaProfile):
+    """Simple 2-halo term for lensing analysis"""
+    def __init__(self, z, powspec, cosmo, scalar_ind=0.96):
+        super().__init__()
+        self.requires = sorted(['b'])
+        self.powspec = z
+        self.powspec = powspec
+        self.cosmo = cosmo
+
+        self.w2calc = H2calc(z, powspec, cosmo, scalar_ind)
+
+    def __str__(self):
+        return "Simple2HaloTerm"
+
+    def prepare(self, **kwargs):
+        assert set(self.requires) <= set(kwargs)
+        self.pardict = {"b": kwargs["b"]}
+        self._prepared = True
+
+    def point_ds(self, r, *args, **kwargs):
+        return self.w2calc.wval(r) * self.pardict["b"]
+
+    def single_rbin_ds(self, r0, r1, *args, **kwargs):
+        return self.w2calc.wring(r0, r1) * self.pardict["b"]
+
+
+# TODO implement Offcenterd main + 2 halo term,
+# but this must be done with the shears added befor integration...

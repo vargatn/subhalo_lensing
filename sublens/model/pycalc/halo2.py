@@ -5,10 +5,8 @@
 import scipy.interpolate as interp
 from scipy.integrate import quad
 import numpy as np
-import math
 import hankel
 import astropy.units as u
-from ..pycalc import oc_transform
 
 
 class H2calc(object):
@@ -76,7 +74,7 @@ class H2calc(object):
         pref = pref.to(u.solMass / u.Mpc ** 3)
         return pref.value
 
-    def _wint(self, rr, nn=100, hh=0.03):
+    def wint(self, rr, nn=100, hh=0.03):
         """Hankel integrator"""
         fpow = self.fmaker(rr)
         h = hankel.HankelTransform(nu=2, N=nn, h=hh)
@@ -85,11 +83,11 @@ class H2calc(object):
 
     def wval(self, rr, nn=100, hh=0.03):
         """Vectorized Hankel integrator with the appropriate prefactors"""
-        intres = self._wint(rr, nn=nn, hh=hh)[0]
+        intres = self.wint(rr, nn=nn, hh=hh)[0]
         return intres * self.prefac()
 
     def _wval(self, rr, nn=100, hh=0.03):
-        intres = self._wint(rr, nn=nn, hh=hh)[0] * rr * 2. * np.pi
+        intres = self.wint(rr, nn=nn, hh=hh)[0] * rr * 2. * np.pi
         return intres
 
     def wring(self, r0, r1, nn=100, hh=0.03):
@@ -97,59 +95,5 @@ class H2calc(object):
                         epsrel=1e-3))
         aring = np.pi * (r1 ** 2. - r0 ** 2.)
         return dsum[0] / aring * self.prefac()
-
-# -----------------------------------------------------------------------------
-# TODO This below should be moved to a separate object...
-
-    def _oc_intarg(self, phi, r, dist):
-        """argument for the integral of Off-centered shear"""
-        rr, term1, term2 = oc_transform(phi=phi, r=r, dist=dist)
-        dst_cen = self.wval(rr)
-        dst = dst_cen * (term1 * math.cos(2. * phi) +
-                         term2 * math.sin(2. * phi))
-        return dst
-
-    def wval_oc(self, r, dist):
-        """Calculates the angle-averaged DeltaSigma at polar radius r"""
-        dsum = quad(self._oc_intarg, -math.pi, math.pi,
-                args=(r, dist), points=(0.0,), epsabs=0,
-                epsrel=1e-5)[0]
-        return dsum / (2. * math.pi)
-
-    def _oc_ring(self, r, rs, rho_s, dist, *args, **kwargs):
-        """Calculates the angle-integrated DeltaSigma at polar radius r"""
-        dsum = quad(self._oc_intarg, -math.pi, math.pi,
-                    args=(r, dist), points=(0.0,),
-                    epsabs=0, epsrel=1e-5)[0]
-        return dsum * r
-
-    def wval_oc_ring(self, r0, r1, rs, rho_s, dist, split=True,
-                     *args, **kwargs):
-        """Calculates the ring-averaged DeltaSigma between r0 and r1"""
-        if split * (r0 < dist <=r1):
-            dsum0 = quad(self._oc_ring, r0, dist, args=(rs, rho_s, dist),
-                         epsabs=0, epsrel=1e-4)[0]
-            dsum1 = quad(self._oc_ring, dist, r1, args=(rs, rho_s, dist),
-                         epsabs=0, epsrel=1e-4)[0]
-            dsum = dsum0 + dsum1
-        else:
-            dsum = quad(self._oc_ring, r0, r1, args=(rs, rho_s, dist),
-                        epsabs=0, epsrel=1e-4)[0]
-
-        aring = math.pi * (r1**2. - r0 **2.)
-        return dsum[0] / aring * self.prefac()
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
