@@ -231,7 +231,6 @@ class SuperCompositeHaloLikelihood(LikelihoodBase):
         cinv = np.linalg.inv(cov)
         chisq1 = float(np.dot(diff.T, np.dot(cinv, diff)))
 
-
         return chisq0 + chisq1
 
 
