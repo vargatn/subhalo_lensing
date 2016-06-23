@@ -56,7 +56,7 @@ class ConvertorBase(object):
         Converts the specified parameter names and the specified data table
         into an other sert of physical parameters
 
-        This is just the bas class, does not do anything
+        This is just the base class, does not do anything
         """
         self.requires = []
         self.provides = []

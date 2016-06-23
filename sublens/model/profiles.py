@@ -94,7 +94,7 @@ class DeltaSigmaProfile(object):
         else:
             raise ValueError('mode must be "rr" or "edges"')
 
-
+ # TODO update with new conversion tool!
 class SimpleNFWProfile(DeltaSigmaProfile):
     """The conventional spherical NFW profile"""
     def __init__(self, cosmo=None):
