@@ -9,7 +9,7 @@ from scipy.integrate import quad
 from ..pycalc import oc_transform
 from .halo2 import H2calc
 
-
+# This does not really work...
 class MainHalo(object):
     """Group halo NFW with 2-halo term"""
     def __init__(self, z, spectra, cosmo, scalar_ind=0.96):

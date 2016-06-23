@@ -7,6 +7,7 @@ from scipy.integrate import quad
 
 from ..pycalc import oc_transform
 
+
 def nfw_deltasigma(r, rs, rho_s, *args, **kwargs):
     """
     Delta-Sigma profile of the NFW profile (exact formula)

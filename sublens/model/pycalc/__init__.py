@@ -4,6 +4,7 @@ Python-based calculations
 
 import math
 
+
 def oc_transform(phi, r, dist):
     """
     Argument expression for Integral

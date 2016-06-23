@@ -36,7 +36,7 @@ class H2calc(object):
         """Interpolates the CAMB output power spectra into a callable func."""
         karr = self.spectra[:, 0]
         parr = self.spectra[:, 1]
-        return interp.UnivariateSpline(karr, parr, s=0)
+        return interp.UnivariateSpline(karr, parr, s=0, ext="zeros")
 
     def fmaker(self, rr):
         """
@@ -52,7 +52,6 @@ class H2calc(object):
         lower_norm = (pkfunc(karr[1]) / karr[1] ** self.scalar_ind)
         upper_norm = pkfunc(karr[-2]) / (karr[-2] ** (self.scalar_ind - 4)
                                          * np.log(karr[-2]) ** 2)
-
         scalar_ind = self.scalar_ind
 
         def ufunclike(x):

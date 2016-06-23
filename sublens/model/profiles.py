@@ -243,6 +243,3 @@ class CorrelatedMatterProfile(DeltaSigmaProfile):
     def single_rbin_ds(self, r0, r1, *args, **kwargs):
         return self.w2calc.wring(r0, r1) * self.pardict["b"]
 
-
-# TODO implement Offcenterd main + 2 halo term,
-# but this must be done with the shears added befor integration...
