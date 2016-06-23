@@ -2,7 +2,7 @@
 Shear profile modeling
 """
 
-from .astroconvert import *
-from .partable import *
-from .profiles import *
-
+# from .astroconvert import *
+# from .partable import *
+# from .profiles import *
+#

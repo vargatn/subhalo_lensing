@@ -8,7 +8,6 @@ import warnings
 import numpy as np
 from astropy.cosmology import FlatLambdaCDM
 
-from sublens.model import ConvertorBase
 from ..io.iocosmo import get_cosmopars
 from ..model.profiles import DeltaSigmaProfile
 
@@ -60,15 +59,15 @@ class TableMaker(object):
                               SyntaxWarning)
 
         # Checking if the convertor is able to fill in the missing paramters
-        elif self.convertor is not None and\
+        elif self.convertor is not None and \
                         set(self.convertor.requires) <= set(self.haspars):
             if (set(self.convertor.provides +
-                           self.haspars) < set(self.profobj.requires)):
+                        self.haspars) < set(self.profobj.requires)):
                 raise SyntaxError(('The convertor does not provide'
                                    ' the appropiate parameters, or overwrites'
                                    ' the specified ones'))
             elif (set(self.convertor.provides +
-                        self.haspars) > set(self.profobj.requires)):
+                          self.haspars) > set(self.profobj.requires)):
                 warnings.warn('Unused parameters specified!', SyntaxWarning)
 
             self.conversion_required = True
@@ -83,7 +82,7 @@ class TableMaker(object):
 
         # flat grid containing all parameters
         self.fallgrid = None
-        if not  self.conversion_required:
+        if not self.conversion_required:
             self.fallgrid = self.fgrid
 
         # some placeholders for the upcoming table
@@ -120,7 +119,7 @@ class TableMaker(object):
         pnames = self.profobj.requires
         self.dstable = []
         for i, par in enumerate(self.fallgrid):
-            if verbose_step is not None and i%int(verbose_step) == 0:
+            if verbose_step is not None and i % int(verbose_step) == 0:
                 print(i)
             self.profobj.prepare(**dict(zip(pnames, par)))
             self.profobj.calc(rr, mode=mode)
@@ -159,6 +158,7 @@ class TableMaker(object):
 
 class LookupTable(object):
     """Lookup Table"""
+
     def __init__(self, table):
         """
         Enables re-averaging profiles based on the pre-calculated table
@@ -189,14 +189,14 @@ class LookupTable(object):
     def __str__(self):
         return "LookupTable"
 
-    def get_edges(self, default_d_edge = 1.):
+    def get_edges(self, default_d_edge=1.):
         """Creates DD histogram edges based on grid parameters"""
         edges = []
         for i, mid in enumerate(self.has_mids):
             if len(mid) > 1:
                 diff = np.diff(self.has_mids[i])
-                edge = np.array([mid[0] - diff[0]/2.] +
-                                list(np.array(mid[:-1] + diff/2.)) +
+                edge = np.array([mid[0] - diff[0] / 2.] +
+                                list(np.array(mid[:-1] + diff / 2.)) +
                                 [mid[-1] + diff[-1] / 2.])
             else:
                 # edge = [mid[0] - default_d_edge, mid[0] + default_d_edge]

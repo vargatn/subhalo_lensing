@@ -2,8 +2,6 @@
 Python-based calculations
 """
 
-from ..pycalc.trunc_nfw import tnfw as ds_tnfw
-
 from ..pycalc.full_nfw import nfw_deltasigma
 from ..pycalc.full_nfw import nfw_ring as ds_nfw_ring
 

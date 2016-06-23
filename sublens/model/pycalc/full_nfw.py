@@ -4,6 +4,7 @@ Calculates DeltaSigma profile for a off-centered NFW halo
 
 import math
 from scipy.integrate import quad
+from ..pycalc import oc_transform
 
 
 def nfw_deltasigma(r, rs, rho_s, *args, **kwargs):
@@ -58,3 +59,44 @@ def nfw_ring(r0, r1, rs, rho_s, *args, **kwargs):
     dsum = quad(_nfw_ring, r0, r1, args=(rs, rho_s))[0]
     aring = math.pi * (r1**2. - r0 **2.)
     return dsum / aring
+
+
+def _oc_nfw_intarg(phi, r, rs, rho_s, dist):
+    """argument for the integral of Off-centered shear"""
+    rr, term1, term2 = oc_transform(phi=phi, r=r, dist=dist)
+    dst_cen = nfw_deltasigma(rr, rs, rho_s)
+    dst = dst_cen * (term1 * math.cos(2. * phi) + term2 * math.sin(2. * phi))
+    return dst
+
+
+def oc_nfw(r, rs, rho_s, dist, *args, **kwargs):
+    """Calculates the angle-averaged DeltaSigma at polar radius r"""
+    dsum = quad(_oc_nfw_intarg, -math.pi, math.pi,
+                args=(r, rs, rho_s, dist), points=(0.0,), epsabs=0,
+                epsrel=1e-5)[0]
+    return dsum / (2. * math.pi)
+
+
+def _oc_nfw_ring(r, rs, rho_s, dist, *args, **kwargs):
+    """Calculates the angle-integrated DeltaSigma at polar radius r"""
+    dsum = quad(_oc_nfw_intarg, -math.pi, math.pi,
+                args=(r, rs, rho_s, dist), points=(0.0,),
+                epsabs=0, epsrel=1e-5)[0]
+    return dsum * r
+
+
+def oc_nfw_ring(r0, r1, rs, rho_s, dist, split=True, *args, **kwargs):
+    """Calculates the ring-averaged DeltaSigma between r0 and r1"""
+    if split * (r0 < dist <=r1):
+        dsum0 = quad(_oc_nfw_ring, r0, dist, args=(rs, rho_s, dist),
+                     epsabs=0, epsrel=1e-4)[0]
+        dsum1 = quad(_oc_nfw_ring, dist, r1, args=(rs, rho_s, dist),
+                     epsabs=0, epsrel=1e-4)[0]
+        dsum = dsum0 + dsum1
+    else:
+        dsum = quad(_oc_nfw_ring, r0, r1, args=(rs, rho_s, dist),
+                    epsabs=0, epsrel=1e-4)[0]
+
+    aring = math.pi * (r1**2. - r0 **2.)
+    return dsum / aring
+
