@@ -172,7 +172,7 @@ class TruncatedNFWProfile(DeltaSigmaProfile):
         prov = dict(zip(self._provides, [kwargs.pop(key)
                                          for key in self._requires]))
         prov.update(kwargs)
-        self.profpars, self.parnames = nfw_params(self.cosmo, delta=500,
+        self.profpars, self.parnames = nfw_params(self.cosmo, delta=200,
                                                   **prov)
         self.profpars += (kwargs["rt"],)
         self.parnames += ("rt",)
@@ -202,8 +202,10 @@ class OffsetNFWProfile(DeltaSigmaProfile):
         prov = dict(zip(self._provides, [kwargs.pop(key)
                                          for key in self._requires]))
         prov.update(kwargs)
-        self.profpars, self.parnames = nfw_params(self.cosmo, delta=500,
+        print(prov)
+        self.profpars, self.parnames = nfw_params(self.cosmo, delta=200,
                                                   **prov)
+        print(self.profpars)
         self.profpars += (kwargs["dist"],)
         self.parnames += ("dist",)
         self.pardict = dict(zip(self.parnames, self.profpars))

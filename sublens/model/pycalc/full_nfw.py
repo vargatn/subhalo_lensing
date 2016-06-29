@@ -61,6 +61,7 @@ def nfw_ring(r0, r1, rs, rho_s, *args, **kwargs):
     aring = math.pi * (r1**2. - r0 **2.)
     return dsum / aring
 
+
 def _oc_nfw_intarg(phi, r, rs, rho_s, dist):
     """argument for the integral of Off-centered shear"""
     rr, term1, term2 = oc_transform(phi=phi, r=r, dist=dist)
@@ -68,12 +69,14 @@ def _oc_nfw_intarg(phi, r, rs, rho_s, dist):
     dst = dst_cen * (term1 * math.cos(2. * phi) + term2 * math.sin(2. * phi))
     return dst
 
+
 def oc_nfw(r, rs, rho_s, dist, *args, **kwargs):
     """Calculates the angle-averaged DeltaSigma at polar radius r"""
     dsum = quad(_oc_nfw_intarg, -math.pi, math.pi,
                 args=(r, rs, rho_s, dist), points=(0.0,), epsabs=0,
                 epsrel=1e-5)[0]
     return dsum / (2. * math.pi)
+
 
 def _oc_nfw_ring(r, rs, rho_s, dist, *args, **kwargs):
     """Calculates the angle-integrated DeltaSigma at polar radius r"""
