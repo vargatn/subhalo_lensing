@@ -158,7 +158,6 @@ class TableMaker(object):
 
 class LookupTable(object):
     """Lookup Table"""
-
     def __init__(self, table):
         """
         Enables re-averaging profiles based on the pre-calculated table
@@ -199,17 +198,15 @@ class LookupTable(object):
                                 list(np.array(mid[:-1] + diff / 2.)) +
                                 [mid[-1] + diff[-1] / 2.])
             else:
-                # edge = [mid[0] - default_d_edge, mid[0] + default_d_edge]
                 edge = [-np.inf, np.inf]
             edges.append(edge)
         return edges
 
-    def get_weights(self, sample):
+    def get_sample_weights(self, sample):
         """Calculates weights based on the histogram counts within the edges"""
-        gshape = self.par_grid.shape[1:]
+        # gshape = self.par_grid.shape[1:]
         counts, _edges = np.histogramdd(sample, bins=self.edges)
         weights = counts.flatten() / np.sum(counts)
-
         return weights
 
     def combine_profile(self, sample, parnames, checknan=True):
@@ -219,7 +216,7 @@ class LookupTable(object):
             raise ValueError('invalid parameter names or order!')
 
         self.edges = self.get_edges()
-        self.ww = self.get_weights(sample)
+        self.ww = self.get_sample_weights(sample)
 
         if checknan:
             dstable = np.nan_to_num(self.dstable)

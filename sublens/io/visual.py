@@ -30,7 +30,7 @@ def contprep(data, sample=1e4, **kwargs):
     return allgrid, (ta95, ta68)
 
 
-def conf1d(pval, grid, vals, res=200, etol=1e-3, **kwargs):
+def conf1d(pval, grid, vals, res=200, etol=1e-2, **kwargs):
     """
     Calculates cutoff values for a given percentile for 1D distribution
 
@@ -61,7 +61,7 @@ def conf1d(pval, grid, vals, res=200, etol=1e-3, **kwargs):
     return tcut, pvals[tind]
 
 
-def conf2d(pval, xxg, yyg, vals, res=200, etol=1e-3, **kwargs):
+def conf2d(pval, xxg, yyg, vals, res=200, etol=1e-2, **kwargs):
     """
     Calculates cutoff values for a given percentile for 2D distribution
 
@@ -165,7 +165,7 @@ def kde_smoother_2d(pararr, xlim=None, ylim=None, num=100, pad=0.1):
     return xx, yy, kvals
 
 
-def corner(par_names, par_list, par_edges, figsize=(8, 8), color='black', fig=None,
+def corner(pars, par_list, par_edges, figsize=(8, 8), color='black', fig=None,
            axarr=None, mode="hist", cmap="gray_r", normed=True, fontsize=12,
            **kwargs):
     """
@@ -173,7 +173,7 @@ def corner(par_names, par_list, par_edges, figsize=(8, 8), color='black', fig=No
 
     NOTE: currently the axis ticks may overlap...
 
-    :param par_names: name of parameters to display
+    :param pars: name of parameters to display
 
     :param par_list: list of parameter arrays: the DATA to show
 
@@ -203,7 +203,7 @@ def corner(par_names, par_list, par_edges, figsize=(8, 8), color='black', fig=No
 
     :return: fig, axarr
     """
-    npars = len(par_names)
+    npars = len(pars)
     if fig is None and axarr is None:
         fig, axarr = plt.subplots(nrows=npars, ncols=npars, sharex=False,
                                   sharey=False, figsize=figsize)
@@ -221,9 +221,9 @@ def corner(par_names, par_list, par_edges, figsize=(8, 8), color='black', fig=No
 
         # Adding the distribution of parameters
         [ax.set_xlabel(par, fontsize=fontsize)
-         for (ax, par) in zip(axarr[-1, :], par_names)]
+         for (ax, par) in zip(axarr[-1, :], pars)]
         [ax.set_ylabel(par, fontsize=fontsize)
-         for (ax, par) in zip(axarr[1:, 0], par_names[1:])]
+         for (ax, par) in zip(axarr[1:, 0], pars[1:])]
 
         [ax.tick_params(labelsize=8) for ax in axarr.flatten()]
 

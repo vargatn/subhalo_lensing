@@ -118,14 +118,16 @@ class DuffyCScale(ConvertorBase):
         self.b200 = -0.091
         self.c200 = -0.44
 
-    def convert(self, ftab, parnames=None):
+    def convert(self, ftab, parnames=None, point=False):
         """
         Performs conversion
 
         :param ftab: np 2D array containing the  parameters, must be sorted if
             parnames are not specified
+
         :param parnames: list of parameter names for each column of the input
                 ftab table
+
         :return: np.array of c200c values
         """
         indices = self._get_indices(parnames)
