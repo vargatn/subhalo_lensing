@@ -4,15 +4,34 @@ Parameter table and distribution matching
 import datetime
 import pickle
 import warnings
+import copy
 
 import numpy as np
 from astropy.cosmology import FlatLambdaCDM
 
-import multiprocessing as mp
-
+from multiprocessing import Pool
 
 from ..io.iocosmo import get_cosmopars
 from ..model.profiles import DeltaSigmaProfile
+
+
+def partition(lst, n):
+    division = len(lst) / float(n)
+    return [lst[int(round(division * i)): int(round(division * (i + 1)))]
+            for i in range(n) ]
+
+
+def mymapper(pl):
+    fparchunk, profobj, rarr, mode = pl
+
+    pnames = profobj.requires
+    dstable = []
+    for i, par in enumerate(fparchunk):
+        profobj.prepare(**dict(zip(pnames, par)))
+        profobj.calc(rarr, mode=mode)
+        dstable.append(profobj.ds)
+
+    return np.array(dstable)
 
 
 # FIXME watch out for TypeErrors coming from the set(list) operations!!
@@ -129,6 +148,37 @@ class TableMaker(object):
             self.dstable.append(self.profobj.ds)
 
         self.dstable = np.array(self.dstable)
+        self.rr = self.profobj.rr
+        self.redges = self.profobj.redges
+        self.profobj.reset()
+        self.time_stamp = str(datetime.datetime.utcnow())
+        self.hasprofile = True
+
+    def calc_ds_multi(self, rr, mode="rr", nprocess=1, shuffle_seed=5):
+        """Attempt for multi-core calculation"""
+        if not np.iterable(rr):
+            rr = [rr]
+        rr = np.array(rr)
+
+        np.random.seed(shuffle_seed)
+        sind = np.random.permutation(len(self.fallgrid))
+
+        fparchunks = partition(self.fallgrid[sind], nprocess)
+        objchunks = [copy.deepcopy(self.profobj) for i in range(nprocess)]
+        rlists = [copy.deepcopy(rr) for i in range(nprocess)]
+
+        plist = [[fpar, obj, rlist, copy.deepcopy(mode)]
+                 for (fpar, obj, rlist) in zip(fparchunks, objchunks, rlists)]
+
+        pool = Pool(processes=nprocess)
+        multi_res = pool.map(mymapper, plist)
+        pool.close()
+        pool.join()
+
+        cres = np.concatenate(multi_res)
+        self.dstable = np.zeros(shape=(len(self.fallgrid), len(cres[0])))
+        self.dstable[sind] = cres
+
         self.rr = self.profobj.rr
         self.redges = self.profobj.redges
         self.profobj.reset()
