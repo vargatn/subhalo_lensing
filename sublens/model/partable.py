@@ -160,6 +160,9 @@ class TableMaker(object):
             rr = [rr]
         rr = np.array(rr)
 
+        if nprocess > len(self.fallgrid):
+            raise ValueError("more processes requested than parameters!")
+
         np.random.seed(shuffle_seed)
         sind = np.random.permutation(len(self.fallgrid))
 
