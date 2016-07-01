@@ -8,6 +8,9 @@ import warnings
 import numpy as np
 from astropy.cosmology import FlatLambdaCDM
 
+import multiprocessing as mp
+
+
 from ..io.iocosmo import get_cosmopars
 from ..model.profiles import DeltaSigmaProfile
 
