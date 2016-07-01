@@ -29,7 +29,7 @@ Contents:
 
 """
 
-from .shearops import *
-from .rotate import *
-from .magtools import *
-from .troughs import *
+# from .shearops import *
+# from .rotate import *
+# from .magtools import *
+# from .troughs import *

@@ -11,6 +11,7 @@ def caparea(theta):
     val = 2. * np.pi * (1. - np.cos(theta))
     return val
 
+
 def rotate(vv, kk, angles):
     """
     Rotation on a sphere unit with vectors using the exact formula
