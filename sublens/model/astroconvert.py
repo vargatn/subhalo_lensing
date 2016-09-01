@@ -288,3 +288,17 @@ def cscale_duffy(m200=0.0, z=0.0, **kwargs):
     c200 = -0.44
     c = a200 * (m200 / mpivot) ** b200 * (1. + z) ** c200
     return c
+
+
+def mass_from_rlum(rlum):
+    """
+    Converts r-band asbolute luminosity to stellar mass
+
+    Works for red galaxies only (the quiet type)
+
+    :param rlum: log10 L_r in L_Sun
+
+    :returns: M_star in M_Sun
+    """
+    mass = 1.093 * rlum - 0.573
+    return mass

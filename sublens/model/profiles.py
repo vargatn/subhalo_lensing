@@ -16,6 +16,10 @@ from ..model.astroconvert import nfw_params
 from ..model.pycalc.full_nfw import nfw_deltasigma
 from ..model.pycalc.full_nfw import nfw_ring
 
+from ..model.pycalc.pointmass import pointmass
+from ..model.pycalc.pointmass import point_ring
+
+
 from ..model.pycalc.full_nfw import oc_nfw
 from ..model.pycalc.full_nfw import oc_nfw_ring
 
@@ -216,6 +220,29 @@ class OffsetNFWProfile(DeltaSigmaProfile):
 
     def single_rbin_ds(self, r0, r1, *args, **kwargs):
         return oc_nfw_ring(r0, r1, **self.pardict)
+
+# -----------------------------------------------------------------------------
+
+class PointMassProfile(DeltaSigmaProfile):
+    """A simple point mass"""
+    def __init__(self, cosmo=None):
+        super().__init__(cosmo=cosmo)
+        self.requires = sorted(['mpoint'])
+        self.mpoint = None
+
+    def __str__(self):
+        return "PointMassProfile"
+
+    def prepare(self, mpoint, **kwargs):
+        self.pardict = {"mpoint": mpoint}
+        self._prepared = True
+
+    def point_ds(self, r, *args, **kwargs):
+        return pointmass(r, **self.pardict)
+
+    def single_rbin_ds(self, r0, r1, *args, **kwargs):
+        return point_ring(r0, r1, **self.pardict)
+
 
 # -----------------------------------------------------------------------------
 

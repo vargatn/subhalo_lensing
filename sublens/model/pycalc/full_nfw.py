@@ -101,3 +101,5 @@ def oc_nfw_ring(r0, r1, rs, rho_s, dist, split=True, *args, **kwargs):
     aring = math.pi * (r1**2. - r0 **2.)
     return dsum / aring
 
+
+
