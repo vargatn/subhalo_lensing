@@ -228,7 +228,6 @@ class PointMassProfile(DeltaSigmaProfile):
     def __init__(self, cosmo=None):
         super().__init__(cosmo=cosmo)
         self.requires = sorted(['mpoint'])
-        self.mpoint = None
 
     def __str__(self):
         return "PointMassProfile"
