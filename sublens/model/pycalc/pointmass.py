@@ -16,7 +16,7 @@ def pointmass(r, mpoint, *args, **kwargs):
     :return: value of tangential shear at distance r
     """
 
-    shear = mpoint / r /r
+    shear = 10**mpoint / r /r
     return shear
 
 
