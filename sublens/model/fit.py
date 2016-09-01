@@ -5,6 +5,9 @@ MCMC base and likelihoods
 import numpy as np
 
 
+def is_pos_def(x):
+    return np.all(np.linalg.eigvals(x) > 0)
+
 def mcmc(like, names, par0, stepsize, limits, extra_pars=None, nstep=10,
          seed=None, rng=None, verbose_step=None, covstep=None, **kwargs):
 
@@ -69,7 +72,13 @@ def mcmc(like, names, par0, stepsize, limits, extra_pars=None, nstep=10,
         if verbose_step is not None and i % verbose_step == 0:
             print(i)
         if covstep is not None and i > 0 and i % covstep == 0:
-            stepmatr = np.cov(parvec.T)
+
+            cov = np.cov(parvec.T)
+            if is_pos_def(np.matrix(cov)):
+                stepmatr = np.cov(parvec.T)
+            else:
+                print("cov update skipped")
+
         ds = dsvec[-1]
         par = parvec[-1]
 
