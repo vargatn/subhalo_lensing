@@ -233,7 +233,7 @@ class PointMassProfile(DeltaSigmaProfile):
         return "PointMassProfile"
 
     def prepare(self, mpoint, **kwargs):
-        self.pardict = {"mpoint": mpoint}
+        self.pardict = {"mpoint": 10**mpoint}
         self._prepared = True
 
     def point_ds(self, r, *args, **kwargs):
