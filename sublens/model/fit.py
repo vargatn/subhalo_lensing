@@ -116,6 +116,137 @@ class LikelihoodBase(object):
         raise NotImplementedError
 
 
+
+
+
+def distmatch(ptab, dsample, m200c, z, pdims=(200, 200, 20)):
+    mind = np.argmin((ptab["par_mids"]["m200c"] - m200c)**2.)
+    zind = np.argmin((ptab["par_mids"]["z"] - z)**2.)
+
+    tinds = np.array([np.ravel_multi_index((i, mind, zind), dims=pdims)
+                      for i in range(200)])
+
+    darr = ptab["par_mids"]["dist"]
+    diff = np.diff(darr)
+    dedges = np.array([darr[0] - diff[0] / 2.] + list(np.array(darr[:-1] + diff / 2.)) +
+                      [darr[-1] + diff[-1] / 2.])
+
+    counts, edges = np.histogram(dsample, bins=dedges)
+
+    dsc = np.average(ptab["dstable"][tinds], weights=counts, axis=0)
+    return dsc
+
+
+def miscmatch(ptab, dsample, m200c, z, pdims=(200, 200, 20), fcen=1.0, sigma=1.0, dsys=0.0, normal2d=None):
+    mind = np.argmin((ptab["par_mids"]["m200c"] - m200c) ** 2.)
+    zind = np.argmin((ptab["par_mids"]["z"] - z) ** 2.)
+
+    tinds = np.array([np.ravel_multi_index((i, mind, zind), dims=pdims)
+                      for i in range(200)])
+
+    darr = ptab["par_mids"]["dist"]
+    diff = np.diff(darr)
+    dedges = np.array([darr[0] - diff[0] / 2.] + list(np.array(darr[:-1] + diff / 2.)) +
+                      [darr[-1] + diff[-1] / 2.])
+
+    counts, edges = np.histogram(dsample, bins=dedges)
+
+    misccounts = np.zeros(shape=counts.shape)
+    for i, count in enumerate(counts):
+        if count > 0:
+            # parameters for the 2D gaussian
+            mean = np.array((darr[i] - dsys, 0))
+            refsample = normal2d * sigma + mean
+            #             refcov = np.eye(2) * sigma
+            #             refsample = np.random.multivariate_normal(mean, cov=refcov, size=size)
+            refr = np.sqrt(np.sum(refsample ** 2., axis=1))
+            href, tmp = np.histogram(refr, bins=dedges, normed=True)
+            #         print(counts)
+            #         print(href)
+            misccounts += count * href
+
+    misccounts /= np.sum(misccounts)
+    dsmc = np.average(ptab["dstable"][tinds], weights=misccounts, axis=0)
+    return dsmc, misccounts
+
+
+class DirectSingleLikelihood(LikelihoodBase):
+    """
+    The old fashioned example likelihood
+    """
+
+    def __init__(self, subobj, partab, distarr, obs_profile, redges, zfix=0.5, fit_range=None, size=1e5):
+        """
+        Likelihood function for a single galaxy -- parent cluster system
+
+        !!!At fixed redshift zfix!!!
+
+
+        Implemented components:
+        -------------------------
+
+        * galaxy halo: NFW with m200c and c200c
+
+        * centered halo: lookup table with fixed dist_array and M200c
+
+        * miscentered halo: uses centered halo, with f_cen and sigma_cen
+
+        """
+        super().__init__()
+
+        self.subobj = subobj
+        self.partab = partab
+        self.distarr = distarr
+        self.zfix = zfix
+
+        self.obs_profile = obs_profile
+        self.requires = ["msub", "csub", "mpar", "fcen", "smiscen", "dsys"]
+
+        self.rr = self.obs_profile['rr']
+        self.redges = redges
+        self.mvec = np.zeros(shape=self.rr.shape)
+        self.fit_range = fit_range
+
+        # 2D gaussian for the miscentering
+        self.refsample = np.random.multivariate_normal(np.zeros(2), cov=np.eye(2), size=int(size))
+
+    def get_like(self, msub, csub, mpar, fcen, smiscen, dsys):
+        """Evaluates likelihood. Parameters should be specified bz keywords"""
+
+        # getting subhalo profile
+        self.subobj.prepare(m200c=msub, c200c=csub, z=self.zfix)
+        self.subobj.rbin_deltasigma(self.redges)
+        ds_sub = self.subobj.ds
+
+        # getting centered parent cluster profile
+        ds_parc = distmatch(self.partab, self.distarr, mpar, self.zfix)
+
+        # getting miscentered parent cluster profile
+        ds_parmc, misccounts = miscmatch(self.partab, self.distarr, mpar,
+                                         self.zfix, sigma=smiscen, dsys=dsys,
+                                         normal2d=self.refsample)
+
+        if self.fit_range is None:
+            self.fit_range = (0., np.inf)
+        index = np.where((self.fit_range[0] <= self.obs_profile['rr']) *
+                         (self.fit_range[1] > self.obs_profile['rr']))[0]
+
+        self.mvec_others = [ds_sub, ds_parc, ds_parmc]
+
+        self.mvec = ds_sub + fcen * ds_parc + (1. - fcen) * ds_parmc
+
+        dvec = self.obs_profile['dst'][index]
+
+        cov = self.obs_profile['dst_cov'][index, :][:, index]
+        diff = (dvec - self.mvec[index])
+        cinv = np.linalg.inv(cov)
+        chisq = float(np.dot(diff.T, np.dot(cinv, diff)))
+        return chisq
+
+
+# -----------------------------------------------------------------------------------------
+# Older unused modules
+
 class SimpleLikelihood(LikelihoodBase):
     """
     The old fashioned example likelihood
