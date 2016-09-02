@@ -160,34 +160,34 @@ class SimpleNFWProfile500(SimpleNFWProfile):
         self._prepared = True
 
 
-# class TruncatedNFWProfile(DeltaSigmaProfile):
-#     """The NFW profile with a hard cutoff at rt"""
-#     def __init__(self, cosmo=None):
-#         super().__init__(cosmo=cosmo)
-#         self.requires = sorted(['c200c', 'm200c', 'z', 'rt'])
-#         self._provides = ['clike', 'mlike']
-#         self._requires = ['c200c', 'm200c']
-#
-#     def __str__(self):
-#         return "TruncatedNFWProfile"
-#
-#     def prepare(self, **kwargs):
-#         assert set(self.requires) <= set(kwargs)
-#         prov = dict(zip(self._provides, [kwargs.pop(key)
-#                                          for key in self._requires]))
-#         prov.update(kwargs)
-#         self.profpars, self.parnames = nfw_params(self.cosmo, delta=200,
-#                                                   **prov)
-#         self.profpars += (kwargs["rt"],)
-#         self.parnames += ("rt",)
-#         self.pardict = dict(zip(self.parnames, self.profpars))
-#         self._prepared = True
-#
-#     def point_ds(self, r, *args, **kwargs):
-#         return tnfw(r, **self.pardict)
-#
-#     def single_rbin_ds(self, r0, r1, *args, **kwargs):
-#         return tnfw_ring(r0, r1, **self.pardict)
+class TruncatedNFWProfile(DeltaSigmaProfile):
+    """The NFW profile with a hard cutoff at rt"""
+    def __init__(self, cosmo=None):
+        super().__init__(cosmo=cosmo)
+        self.requires = sorted(['c200c', 'm200c', 'z', 'rt'])
+        self._provides = ['clike', 'mlike']
+        self._requires = ['c200c', 'm200c']
+
+    def __str__(self):
+        return "TruncatedNFWProfile"
+
+    def prepare(self, **kwargs):
+        assert set(self.requires) <= set(kwargs)
+        prov = dict(zip(self._provides, [kwargs.pop(key)
+                                         for key in self._requires]))
+        prov.update(kwargs)
+        self.profpars, self.parnames = nfw_params(self.cosmo, delta=200,
+                                                  **prov)
+        self.profpars += (kwargs["rt"],)
+        self.parnames += ("rt",)
+        self.pardict = dict(zip(self.parnames, self.profpars))
+        self._prepared = True
+
+    def point_ds(self, r, *args, **kwargs):
+        return tnfw(r, **self.pardict)
+
+    def single_rbin_ds(self, r0, r1, *args, **kwargs):
+        return tnfw_ring(r0, r1, **self.pardict)
 
 
 class OffsetNFWProfile(DeltaSigmaProfile):
