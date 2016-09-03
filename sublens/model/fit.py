@@ -3,6 +3,7 @@ MCMC base and likelihoods
 """
 
 import numpy as np
+from .astroconvert import cscale_duffy
 
 
 def is_pos_def(x):
@@ -249,6 +250,90 @@ class DirectSingleLikelihood(LikelihoodBase):
         cov = self.obs_profile['dst_cov'][index, :][:, index]
         diff = (dvec - self.mvec[index])
         cinv = np.linalg.inv(cov)
+        chisq = float(np.dot(diff.T, np.dot(cinv, diff)))
+        return chisq
+
+
+class DirectJointLikelihood(LikelihoodBase):
+    """
+    The old fashioned example likelihood
+    """
+    def __init__(self, subobj, partab, distarr1, distarr2, obs_profile1, obs_profile2, ppcov,
+                 redges, zfix=0.5, fit_range=None, size=1e5, smiscen=0.6):
+        """
+        Likelihood function for the joint fit of the subhalo parent cluster system
+        !!!At fixed redshift zfix!!!
+        Implemented components:
+        -------------------------
+        * galaxy halo: NFW with m200c and c200c
+        * centered halo: lookup table with fixed dist_array and M200c
+        * miscentered halo: uses centered halo, with f_cen and sigma_cen
+        """
+        super().__init__()
+        self.subobj = subobj
+        self.partab = partab
+        self.distarr1 = distarr1
+        self.distarr2 = distarr2
+        self.smiscen = smiscen
+        self.zfix = zfix
+
+        self.obs_profile1 = obs_profile1
+        self.obs_profile2 = obs_profile2
+        self.requires = ["msub", "csub", "mpar", "fcen"]
+
+        self.rr = self.obs_profile1['rr']
+        self.redges = redges
+        self.mvec = np.zeros(shape=self.rr.shape)
+        self.fit_range = fit_range
+
+        # 2D gaussian for the miscentering
+        self.refsample = np.random.multivariate_normal(np.zeros(2), cov=np.eye(2), size=int(size))
+
+        # getting index and data vector
+        if self.fit_range is None:
+            self.fit_range = (0., np.inf)
+        self.index = np.where((self.fit_range[0] <= self.rr) *
+                              (self.fit_range[1] > self.rr))[0]
+        self.dvec = np.array(list(self.obs_profile1['dst'][self.index]) +
+                             list(self.obs_profile2['dst'][self.index]))
+
+        longind = np.concatenate((self.index, len(self.redges) - 1 + self.index))
+        self.cov = ppcov[longind, :][:, longind]
+
+    def get_like(self, msub1, msub2, mpar, fcen):
+        """Evaluates likelihood. Parameters should be specified bz keywords"""
+
+        # getting the concentration values from Duffy
+        c1 = cscale_duffy(10 ** msub1, self.zfix)
+        c2 = cscale_duffy(10 ** msub2, self.zfix)
+
+        # getting subhalo profiles
+        self.subobj.prepare(m200c=msub1, c200c=c1, z=self.zfix)
+        self.subobj.rbin_deltasigma(self.redges)
+        ds_sub1 = self.subobj.ds
+
+        self.subobj.prepare(m200c=msub2, c200c=c2, z=self.zfix)
+        self.subobj.rbin_deltasigma(self.redges)
+        ds_sub2 = self.subobj.ds
+
+        # getting centered parent cluster profile
+        ds_parc1 = distmatch(self.partab, self.distarr1, mpar, self.zfix)
+        ds_parc2 = distmatch(self.partab, self.distarr2, mpar, self.zfix)
+
+        # getting miscentered parent cluster profile
+        ds_parmc1, misccounts = miscmatch(self.partab, self.distarr1, mpar, self.zfix, sigma=self.smiscen, dsys=0.0,
+                                          normal2d=self.refsample)
+        ds_parmc2, misccounts = miscmatch(self.partab, self.distarr2, mpar, self.zfix, sigma=self.smiscen, dsys=0.0,
+                                          normal2d=self.refsample)
+
+        mvec1 = ds_sub1 + fcen * ds_parc1 + (1. - fcen) * ds_parmc1
+        mvec2 = ds_sub2 + fcen * ds_parc2 + (1. - fcen) * ds_parmc2
+
+        self.mvec_others = [mvec1, mvec2, ds_sub1, ds_sub2, ds_parc1, ds_parc2, ds_parmc1, ds_parmc2]
+        self.mvec = np.concatenate((mvec1[self.index], mvec2[self.index]))
+
+        diff = (self.dvec - self.mvec)
+        cinv = np.linalg.inv(self.cov)
         chisq = float(np.dot(diff.T, np.dot(cinv, diff)))
         return chisq
 
