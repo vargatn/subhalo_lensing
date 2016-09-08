@@ -113,7 +113,7 @@ class DuffyCScale(ConvertorBase):
         self.requires = sorted(['m200c', 'z'])
         self.provides = sorted(['c200c'])
 
-        self.mpivot = 2. * 1e12  # Msun / h100
+        self.mpivot = 2. * 1e12 /0.7 # Msun / h100
         self.a200 = 6.71
         self.b200 = -0.091
         self.c200 = -0.44
@@ -282,7 +282,7 @@ def cscale_duffy(m200=0.0, z=0.0, **kwargs):
     :param z: halo redshift
     :return: concentration
     """
-    mpivot = 2. * 1e12  # Msun / h100
+    mpivot = 2. * 1e12 / 0.7 # Msun / h100
     a200 = 6.71
     b200 = -0.091
     c200 = -0.44
