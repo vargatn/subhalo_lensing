@@ -4,7 +4,8 @@ MCMC base and likelihoods
 
 import numpy as np
 from .astroconvert import cscale_duffy
-
+from .astroconvert import nfw_params
+from ..io.iocosmo import default_cosmo
 
 def is_pos_def(x):
     return np.all(np.linalg.eigvals(x) > 0)
@@ -254,6 +255,45 @@ class DirectSingleLikelihood(LikelihoodBase):
         return chisq
 
 
+#
+def nfwrz(z, r2d, rs, rho_s):
+    x = np.sqrt(z**2 + r2d**2.) / rs
+    val = rho_s / (x * (1 + x)**2.)
+    return val
+
+
+def frt(rarr, msub, mpar):
+    rt = (10**msub / (2. * 10**mpar)) ** (1. / 3.) * rarr
+    return rt
+
+#
+def rtmatch(ttab, mpar, msub, z, rc, pdims=(200, 30, 1)):
+    mind = np.argmin((ttab["par_mids"]["m200c"] - msub) ** 2.)
+    zind = np.argmin((ttab["par_mids"]["z"] - z) ** 2.)
+
+    tinds = np.array([np.ravel_multi_index((mind, i, zind), dims=pdims)
+                      for i in range(30)])
+
+    rtcens = ttab["par_mids"]["rt"]
+    rtdiff = np.diff(rtcens)
+    rtedges = np.array([rtcens[0] - rtdiff[0] / 2.] + list(np.array(rtcens[:-1] + rtdiff / 2.)) +
+                       [rtcens[-1] + rtdiff[-1] / 2.])
+
+    cpar = cscale_duffy(10 ** mpar, z)
+
+    zarr = np.linspace(0.0, 3.0, 10000)
+    rarr = np.sqrt(zarr ** 2. + rc ** 2.)
+
+    (rs, rhos), names = nfw_params(default_cosmo(), z, mpar, cpar / 2.)
+    galdens = nfwrz(zarr, rc, rs, rhos)
+    galdens /= np.sum(galdens)
+    rtarr = frt(rarr, msub, mpar)
+    rtcounts, rtedges = np.histogram(rtarr, bins=rtedges, weights=galdens, normed=True)
+
+    dsc = np.average(ttab["dstable"][tinds], weights=rtcounts, axis=0)
+    return dsc
+
+
 class DirectJointLikelihood(LikelihoodBase):
     """
     The old fashioned example likelihood
@@ -279,7 +319,7 @@ class DirectJointLikelihood(LikelihoodBase):
 
         self.obs_profile1 = obs_profile1
         self.obs_profile2 = obs_profile2
-        self.requires = ["msub", "csub", "mpar", "fcen"]
+        self.requires = ["msub1", "msub2", "mpar", "fcen"]
 
         self.rr = self.obs_profile1['rr']
         self.redges = redges
@@ -336,6 +376,88 @@ class DirectJointLikelihood(LikelihoodBase):
         cinv = np.linalg.inv(self.cov)
         chisq = float(np.dot(diff.T, np.dot(cinv, diff)))
         return chisq
+
+
+# stuff
+
+class TruncatedLikelihood(LikelihoodBase):
+    """
+    The old fashioned example likelihood
+    """
+    def __init__(self, trtab, partab, distarr1, distarr2, obs_profile1, obs_profile2, ppcov,
+                 redges, zfix=0.5, fit_range=None, size=1e5, smiscen=0.6):
+        """
+        Likelihood function for the joint fit of the subhalo parent cluster system
+        !!!At fixed redshift zfix!!!
+        Implemented components:
+        -------------------------
+        * galaxy halo: NFW with m200c and c200c
+        * centered halo: lookup table with fixed dist_array and M200c
+        * miscentered halo: uses centered halo, with f_cen and sigma_cen
+        """
+        super().__init__()
+        pass
+        self.trtab = trtab
+        self.partab = partab
+        self.distarr1 = distarr1
+        self.rc1 = np.median(self.distarr1)
+        self.distarr2 = distarr2
+        self.rc2 = np.median(self.distarr2)
+        self.smiscen = smiscen
+        self.zfix = zfix
+
+        self.obs_profile1 = obs_profile1
+        self.obs_profile2 = obs_profile2
+        self.requires = ["msub1", "msub2", "mpar", "fcen"]
+
+        self.rr = self.obs_profile1['rr']
+        self.redges = redges
+        self.mvec = np.zeros(shape=self.rr.shape)
+        self.fit_range = fit_range
+
+        # 2D gaussian for the miscentering
+        self.refsample = np.random.multivariate_normal(np.zeros(2), cov=np.eye(2), size=int(size))
+
+        # getting index and data vector
+        if self.fit_range is None:
+            self.fit_range = (0., np.inf)
+        self.index = np.where((self.fit_range[0] <= self.rr) *
+                              (self.fit_range[1] > self.rr))[0]
+        self.dvec = np.array(list(self.obs_profile1['dst'][self.index]) +
+                             list(self.obs_profile2['dst'][self.index]))
+
+        longind = np.concatenate((self.index, len(self.redges) - 1 + self.index))
+        self.cov = ppcov[longind, :][:, longind]
+
+    def get_like(self, msub1, msub2, mpar, fcen):
+        """Evaluates likelihood. Parameters should be specified bz keywords"""
+        pass
+
+#         # getting subhalo profiles
+        ds_sub1 = rtmatch(self.trtab, mpar, msub1, self.zfix, rc=self.rc1)
+        ds_sub2 = rtmatch(self.trtab, mpar, msub2, self.zfix, rc=self.rc2)
+
+        # getting centered parent cluster profile
+        ds_parc1 = distmatch(self.partab, self.distarr1, mpar, self.zfix)
+        ds_parc2 = distmatch(self.partab, self.distarr2, mpar, self.zfix)
+
+        # getting miscentered parent cluster profile
+        ds_parmc1, misccounts = miscmatch(self.partab, self.distarr1, mpar, self.zfix, sigma=self.smiscen, dsys=0.0,
+                                          normal2d=self.refsample)
+        ds_parmc2, misccounts = miscmatch(self.partab, self.distarr2, mpar, self.zfix, sigma=self.smiscen, dsys=0.0,
+                                          normal2d=self.refsample)
+
+        mvec1 = ds_sub1 + fcen * ds_parc1 + (1. - fcen) * ds_parmc1
+        mvec2 = ds_sub2 + fcen * ds_parc2 + (1. - fcen) * ds_parmc2
+
+        self.mvec_others = [mvec1, mvec2, ds_sub1, ds_sub2, ds_parc1, ds_parc2, ds_parmc1, ds_parmc2]
+        self.mvec = np.concatenate((mvec1[self.index], mvec2[self.index]))
+
+        diff = (self.dvec - self.mvec)
+        cinv = np.linalg.inv(self.cov)
+        chisq = float(np.dot(diff.T, np.dot(cinv, diff)))
+        return chisq
+
 
 
 # -----------------------------------------------------------------------------------------
