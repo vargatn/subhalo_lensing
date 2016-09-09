@@ -130,7 +130,7 @@ class LikelihoodBase(object):
 
 
 
-def distmatch(ptab, dsample, m200c, z, pdims=(200, 200, 20)):
+def distmatch(ptab, dsample, m200c, z, pdims=(200, 200, 20), umax=200):
     mind = np.argmin((ptab["par_mids"]["m200c"] - m200c)**2.)
     zind = np.argmin((ptab["par_mids"]["z"] - z)**2.)
 
@@ -148,12 +148,13 @@ def distmatch(ptab, dsample, m200c, z, pdims=(200, 200, 20)):
     return dsc
 
 
-def miscmatch(ptab, dsample, m200c, z, pdims=(200, 200, 20), fcen=1.0, sigma=1.0, dsys=0.0, normal2d=None):
+def miscmatch(ptab, dsample, m200c, z, pdims=(200, 200, 20), fcen=1.0, sigma=1.0, dsys=0.0, normal2d=None,
+              umax=200):
     mind = np.argmin((ptab["par_mids"]["m200c"] - m200c) ** 2.)
     zind = np.argmin((ptab["par_mids"]["z"] - z) ** 2.)
 
     tinds = np.array([np.ravel_multi_index((i, mind, zind), dims=pdims)
-                      for i in range(200)])
+                      for i in range(umax)])
 
     darr = ptab["par_mids"]["dist"]
     diff = np.diff(darr)
@@ -186,7 +187,8 @@ class DirectSingleLikelihood(LikelihoodBase):
     The old fashioned example likelihood
     """
 
-    def __init__(self, subobj, partab, distarr, obs_profile, redges, zfix=0.5, fit_range=None, size=1e5):
+    def __init__(self, subobj, partab, distarr, obs_profile, redges, zfix=0.5, fit_range=None, size=1e5, umax=200,
+                 pdims=(200, 200, 20)):
         """
         Likelihood function for a single galaxy -- parent cluster system
 
@@ -220,6 +222,8 @@ class DirectSingleLikelihood(LikelihoodBase):
 
         # 2D gaussian for the miscentering
         self.refsample = np.random.multivariate_normal(np.zeros(2), cov=np.eye(2), size=int(size))
+        self.umax = umax
+        self.pdims = pdims
 
     def get_like(self, msub, csub, mpar, fcen, smiscen, dsys):
         """Evaluates likelihood. Parameters should be specified bz keywords"""
@@ -230,12 +234,12 @@ class DirectSingleLikelihood(LikelihoodBase):
         ds_sub = self.subobj.ds
 
         # getting centered parent cluster profile
-        ds_parc = distmatch(self.partab, self.distarr, mpar, self.zfix)
+        ds_parc = distmatch(self.partab, self.distarr, mpar, self.zfix, umax=self.umax, pdims=self.pdims)
 
         # getting miscentered parent cluster profile
         ds_parmc, misccounts = miscmatch(self.partab, self.distarr, mpar,
                                          self.zfix, sigma=smiscen, dsys=dsys,
-                                         normal2d=self.refsample)
+                                         normal2d=self.refsample, umax=self.umax, pdims=self.pdims)
 
         if self.fit_range is None:
             self.fit_range = (0., np.inf)
@@ -267,12 +271,12 @@ def frt(rarr, msub, mpar):
     return rt
 
 #
-def rtmatch(ttab, mpar, msub, z, rc, pdims=(200, 30, 1)):
+def rtmatch(ttab, mpar, msub, z, rc, pdims=(200, 30, 1), umax=30):
     mind = np.argmin((ttab["par_mids"]["m200c"] - msub) ** 2.)
     zind = np.argmin((ttab["par_mids"]["z"] - z) ** 2.)
 
     tinds = np.array([np.ravel_multi_index((mind, i, zind), dims=pdims)
-                      for i in range(30)])
+                      for i in range(umax)])
 
     rtcens = ttab["par_mids"]["rt"]
     rtdiff = np.diff(rtcens)
@@ -299,7 +303,7 @@ class DirectJointLikelihood(LikelihoodBase):
     The old fashioned example likelihood
     """
     def __init__(self, subobj, partab, distarr1, distarr2, obs_profile1, obs_profile2, ppcov,
-                 redges, zfix=0.5, fit_range=None, size=1e5, smiscen=0.6):
+                 redges, zfix=0.5, fit_range=None, size=1e5, smiscen=0.6, umax=200, pdims=(200, 200, 20)):
         """
         Likelihood function for the joint fit of the subhalo parent cluster system
         !!!At fixed redshift zfix!!!
@@ -340,6 +344,10 @@ class DirectJointLikelihood(LikelihoodBase):
         longind = np.concatenate((self.index, len(self.redges) - 1 + self.index))
         self.cov = ppcov[longind, :][:, longind]
 
+        self.umax = umax
+        self.pdims = pdims
+
+
     def get_like(self, msub1, msub2, mpar, fcen):
         """Evaluates likelihood. Parameters should be specified bz keywords"""
 
@@ -357,14 +365,14 @@ class DirectJointLikelihood(LikelihoodBase):
         ds_sub2 = self.subobj.ds
 
         # getting centered parent cluster profile
-        ds_parc1 = distmatch(self.partab, self.distarr1, mpar, self.zfix)
-        ds_parc2 = distmatch(self.partab, self.distarr2, mpar, self.zfix)
+        ds_parc1 = distmatch(self.partab, self.distarr1, mpar, self.zfix, umax=self.umax, pdims=self.pdims)
+        ds_parc2 = distmatch(self.partab, self.distarr2, mpar, self.zfix, umax=self.umax, pdims=self.pdims)
 
         # getting miscentered parent cluster profile
         ds_parmc1, misccounts = miscmatch(self.partab, self.distarr1, mpar, self.zfix, sigma=self.smiscen, dsys=0.0,
-                                          normal2d=self.refsample)
+                                          normal2d=self.refsample, umax=self.umax, pdims=self.pdims)
         ds_parmc2, misccounts = miscmatch(self.partab, self.distarr2, mpar, self.zfix, sigma=self.smiscen, dsys=0.0,
-                                          normal2d=self.refsample)
+                                          normal2d=self.refsample, umax=self.umax, pdims=self.pdims)
 
         mvec1 = ds_sub1 + fcen * ds_parc1 + (1. - fcen) * ds_parmc1
         mvec2 = ds_sub2 + fcen * ds_parc2 + (1. - fcen) * ds_parmc2
@@ -385,7 +393,8 @@ class TruncatedLikelihood(LikelihoodBase):
     The old fashioned example likelihood
     """
     def __init__(self, trtab, partab, distarr1, distarr2, obs_profile1, obs_profile2, ppcov,
-                 redges, zfix=0.5, fit_range=None, size=1e5, smiscen=0.6):
+                 redges, zfix=0.5, fit_range=None, size=1e5, smiscen=0.6, tumax=200, umax=200,
+                 pdims=(200, 200, 20)):
         """
         Likelihood function for the joint fit of the subhalo parent cluster system
         !!!At fixed redshift zfix!!!
@@ -429,23 +438,27 @@ class TruncatedLikelihood(LikelihoodBase):
         longind = np.concatenate((self.index, len(self.redges) - 1 + self.index))
         self.cov = ppcov[longind, :][:, longind]
 
+        self.tumax = tumax
+        self.umax = umax
+        self.pdims = pdims
+
     def get_like(self, msub1, msub2, mpar, fcen):
         """Evaluates likelihood. Parameters should be specified bz keywords"""
         pass
 
 #         # getting subhalo profiles
-        ds_sub1 = rtmatch(self.trtab, mpar, msub1, self.zfix, rc=self.rc1)
-        ds_sub2 = rtmatch(self.trtab, mpar, msub2, self.zfix, rc=self.rc2)
+        ds_sub1 = rtmatch(self.trtab, mpar, msub1, self.zfix, rc=self.rc1, tumax=self.tumax)
+        ds_sub2 = rtmatch(self.trtab, mpar, msub2, self.zfix, rc=self.rc2, tumax=self.tumax)
 
         # getting centered parent cluster profile
-        ds_parc1 = distmatch(self.partab, self.distarr1, mpar, self.zfix)
-        ds_parc2 = distmatch(self.partab, self.distarr2, mpar, self.zfix)
+        ds_parc1 = distmatch(self.partab, self.distarr1, mpar, self.zfix, umax=self.umax, pdims=self.pdims)
+        ds_parc2 = distmatch(self.partab, self.distarr2, mpar, self.zfix, umax=self.umax, pdims=self.pdims)
 
         # getting miscentered parent cluster profile
         ds_parmc1, misccounts = miscmatch(self.partab, self.distarr1, mpar, self.zfix, sigma=self.smiscen, dsys=0.0,
-                                          normal2d=self.refsample)
+                                          normal2d=self.refsample, umax=self.umax, pdims=self.pdims)
         ds_parmc2, misccounts = miscmatch(self.partab, self.distarr2, mpar, self.zfix, sigma=self.smiscen, dsys=0.0,
-                                          normal2d=self.refsample)
+                                          normal2d=self.refsample, umax=self.umax, pdims=self.pdims)
 
         mvec1 = ds_sub1 + fcen * ds_parc1 + (1. - fcen) * ds_parmc1
         mvec2 = ds_sub2 + fcen * ds_parc2 + (1. - fcen) * ds_parmc2
