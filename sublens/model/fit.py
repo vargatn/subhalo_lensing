@@ -266,12 +266,12 @@ def nfwrz(z, r2d, rs, rho_s):
     return val
 
 
-def frt(rarr, msub, mpar):
-    rt = (10**msub / (2. * 10**mpar)) ** (1. / 3.) * rarr
+def frt(rarr, msub, mpar, value=2.):
+    rt = (10**msub / (value * 10**mpar)) ** (1. / 3.) * rarr
     return rt
 
-#
-def rtmatch(ttab, mpar, msub, z, rc, pdims=(200, 30, 1), umax=30):
+
+def rtmatch(ttab, mpar, msub, z, rc, pdims=(200, 30, 1), umax=30, value=2.):
     mind = np.argmin((ttab["par_mids"]["m200c"] - msub) ** 2.)
     zind = np.argmin((ttab["par_mids"]["z"] - z) ** 2.)
 
@@ -291,7 +291,7 @@ def rtmatch(ttab, mpar, msub, z, rc, pdims=(200, 30, 1), umax=30):
     (rs, rhos), names = nfw_params(default_cosmo(), z, mpar, cpar / 2.)
     galdens = nfwrz(zarr, rc, rs, rhos)
     galdens /= np.sum(galdens)
-    rtarr = frt(rarr, msub, mpar)
+    rtarr = frt(rarr, msub, mpar, value)
     rtcounts, rtedges = np.histogram(rtarr, bins=rtedges, weights=galdens, normed=True)
 
     dsc = np.average(ttab["dstable"][tinds], weights=rtcounts, axis=0)
@@ -394,7 +394,7 @@ class TruncatedLikelihood(LikelihoodBase):
     """
     def __init__(self, trtab, partab, distarr1, distarr2, obs_profile1, obs_profile2, ppcov,
                  redges, zfix=0.5, fit_range=None, size=1e5, smiscen=0.6, tumax=200, umax=200,
-                 pdims=(200, 200, 20)):
+                 pdims=(200, 200, 20), rotvalue=2.):
         """
         Likelihood function for the joint fit of the subhalo parent cluster system
         !!!At fixed redshift zfix!!!
@@ -442,13 +442,15 @@ class TruncatedLikelihood(LikelihoodBase):
         self.umax = umax
         self.pdims = pdims
 
+        self.rotvalue = 2. # the number in the denominator of the tidal radius,  2 or 3 depending on model...
+
     def get_like(self, msub1, msub2, mpar, fcen):
         """Evaluates likelihood. Parameters should be specified bz keywords"""
         pass
 
 #         # getting subhalo profiles
-        ds_sub1 = rtmatch(self.trtab, mpar, msub1, self.zfix, rc=self.rc1, tumax=self.tumax)
-        ds_sub2 = rtmatch(self.trtab, mpar, msub2, self.zfix, rc=self.rc2, tumax=self.tumax)
+        ds_sub1 = rtmatch(self.trtab, mpar, msub1, self.zfix, rc=self.rc1, umax=self.tumax, value=self.rotvalue)
+        ds_sub2 = rtmatch(self.trtab, mpar, msub2, self.zfix, rc=self.rc2, umax=self.tumax, value=self.rotvalue)
 
         # getting centered parent cluster profile
         ds_parc1 = distmatch(self.partab, self.distarr1, mpar, self.zfix, umax=self.umax, pdims=self.pdims)
