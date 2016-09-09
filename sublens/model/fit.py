@@ -442,7 +442,7 @@ class TruncatedLikelihood(LikelihoodBase):
         self.umax = umax
         self.pdims = pdims
 
-        self.rotvalue = 2. # the number in the denominator of the tidal radius,  2 or 3 depending on model...
+        self.rotvalue = rotvalue # the number in the denominator of the tidal radius,  2 or 3 depending on model...
 
     def get_like(self, msub1, msub2, mpar, fcen):
         """Evaluates likelihood. Parameters should be specified bz keywords"""
