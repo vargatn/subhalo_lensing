@@ -393,7 +393,7 @@ class TruncatedLikelihood(LikelihoodBase):
     The old fashioned example likelihood
     """
     def __init__(self, trtab, partab, distarr1, distarr2, obs_profile1, obs_profile2, ppcov,
-                 redges, zfix=0.5, fit_range=None, size=1e5, smiscen=0.6, tumax=200, umax=200,
+                 redges, zfix=0.5, fit_range=None, size=1e5, smiscen=0.6, tumax=30, umax=200,
                  pdims=(200, 200, 20), rotvalue=2.):
         """
         Likelihood function for the joint fit of the subhalo parent cluster system
