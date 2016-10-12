@@ -271,12 +271,15 @@ def frt(rarr, msub, mpar, value=2.):
     return rt
 
 
-def rtmatch(ttab, mpar, msub, z, rc, pdims=(200, 30, 1), umax=30, value=2.):
+def rtmatch(ttab, mpar, msub, z, rc, pdims=(300, 30, 1), umax=30, value=2.):
+    umax = 30
+    pdims = (300, 30, 1)
     mind = np.argmin((ttab["par_mids"]["m200c"] - msub) ** 2.)
     zind = np.argmin((ttab["par_mids"]["z"] - z) ** 2.)
 
     tinds = np.array([np.ravel_multi_index((mind, i, zind), dims=pdims)
                       for i in range(umax)])
+    # TODO There is some bug with the default value
 
     rtcens = ttab["par_mids"]["rt"]
     rtdiff = np.diff(rtcens)

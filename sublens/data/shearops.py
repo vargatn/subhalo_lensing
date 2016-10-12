@@ -437,6 +437,31 @@ class StackedProfileContainer(object):
         self.dst_sub = tmp_dst_sub
         self.dsx_sub = tmp_dsx_sub
 
+    def multiply(self, val):
+        """
+        Calculate the JK estimate on profile times the specified "val"
+
+        The results is updated to self. Use deepcopy to obtain
+        copies of the object for storing the previous state.
+
+        :param val: value (float) to multiply by
+        """
+
+        # clears the profile container
+        self._reset_profile()
+
+        # getting radius values
+        self._get_rr()
+
+        # performs the multiplication
+        self.dst_sub *= val
+
+        # re calculates profiles
+        self._profcalc()
+        self._covcalc()
+
+        self.hasprofile = True
+
     def composite(self, other, operation="-"):
         """
         Calculate the JK estimate on the operation applied to the two profiles
