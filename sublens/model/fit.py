@@ -7,8 +7,10 @@ from .astroconvert import cscale_duffy
 from .astroconvert import nfw_params
 from ..io.iocosmo import default_cosmo
 
+
 def is_pos_def(x):
     return np.all(np.linalg.eigvals(x) > 0)
+
 
 def mcmc(like, names, par0, stepsize, limits, extra_pars=None, nstep=10,
          seed=None, rng=None, verbose_step=None, covstep=None, **kwargs):
@@ -125,9 +127,6 @@ class LikelihoodBase(object):
 
     def get_like(self, *args, **kwargs):
         raise NotImplementedError
-
-
-
 
 
 def distmatch(ptab, dsample, m200c, z, pdims=(200, 200, 20), umax=200):
