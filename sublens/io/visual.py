@@ -167,7 +167,7 @@ def kde_smoother_2d(pararr, xlim=None, ylim=None, num=100, pad=0.1):
 
 def corner(pars, par_list, par_edges, figsize=(8, 8), color='black', fig=None,
            axarr=None, mode="hist", cmap="gray_r", normed=True, fontsize=12,
-           **kwargs):
+           tick_list=None, **kwargs):
     """
     Creates *NICE* corner plot
 
@@ -199,6 +199,8 @@ def corner(pars, par_list, par_edges, figsize=(8, 8), color='black', fig=None,
 
     :param fontsize: for the axis labels
 
+    :param tick_list: list of lists (values) where ticks should be placed
+
     :param kwargs: additional kezword arguments
 
     :return: fig, axarr
@@ -209,15 +211,17 @@ def corner(pars, par_list, par_edges, figsize=(8, 8), color='black', fig=None,
                                   sharey=False, figsize=figsize)
         fig.subplots_adjust(hspace=0.05, wspace=0.05)
 
+        axarr[0, 0].set_yticklabels([])
+
         # hiding upper triangle
-        [[ax.axis('off') for ax in axrow[(i+1):]]
+        [[ax.axis('off') for ax in axrow[(i + 1):]]
          for i, axrow in enumerate(axarr)]
 
         # hiding xlabels
         [[ax.set_xticklabels([]) for ax in axrow]
-         for i, axrow in enumerate(axarr[:-1, :]) ]
+         for i, axrow in enumerate(axarr[:-1, :])]
         [[ax.set_yticklabels([]) for ax in axrow[1:]]
-         for i, axrow in enumerate(axarr[:, :]) ]
+         for i, axrow in enumerate(axarr[:, :])]
 
         # Adding the distribution of parameters
         [ax.set_xlabel(par, fontsize=fontsize)
@@ -231,28 +235,36 @@ def corner(pars, par_list, par_edges, figsize=(8, 8), color='black', fig=None,
                       histtype='step', lw=2.0, normed=normed)
      for i in range(len(par_list))]
 
-    [axarr[i, i].set_xlim((np.min(par_edges[i]), np.max(par_edges[i])))
+    [axarr[i, i].xaxis.set_ticks(tick_list[i])
+     for i in range(len(par_list))]
+
+    [axarr[i, i].set_xlim((par_edges[i][0], par_edges[i][-1]))
      for i in range(len(par_list))]
 
     for i, axrow in enumerate(axarr[1:]):
-        for j, ax in enumerate(axrow[:i+1]):
+        for j, ax in enumerate(axrow[:i + 1]):
+
+            ax.xaxis.set_ticks(tick_list[j])
+            ax.yaxis.set_ticks(tick_list[i + 1])
+
             if mode == "hist":
-                [[ax.hist2d(par_list[j], par_list[i+1],
-                            bins=(par_edges[j], par_edges[i+1]), cmap=cmap,
-                            normed=normed)
-                  for j, ax in enumerate(axrow[:i+1])]
-                 for i, axrow in enumerate(axarr[1:])]
+                counts, xedges, yedges, cax = ax.hist2d(par_list[j], par_list[i + 1],
+                                                        bins=(par_edges[j], par_edges[i + 1]), cmap=cmap,
+                                                        normed=normed, **kwargs)
+                ax.set_xlim((par_edges[j][0], par_edges[j][-1]))
+                ax.set_ylim((par_edges[i + 1][0], par_edges[i + 1][-1]))
+
             elif mode == "contour":
 
                 params = np.vstack((par_list[j], par_list[i + 1])).T
                 xlim = (par_edges[j][0], par_edges[j][-1])
                 ylim = (par_edges[i + 1][0], par_edges[i + 1][-1])
                 # print(params.shape)
-                allgrid, tba = contprep(params, xlim=xlim ,ylim=ylim, **kwargs)
+                allgrid, tba = contprep(params, xlim=xlim, ylim=ylim, **kwargs)
                 # print(tba)
                 ax.contour(allgrid[0], allgrid[1], allgrid[2],
                            levels=tba, colors=color)
                 ax.contourf(allgrid[0], allgrid[1], allgrid[2],
-                           levels=[tba[1], np.inf], colors=color, alpha=0.7)
+                            levels=[tba[1], np.inf], colors=color, alpha=0.7)
 
     return fig, axarr
