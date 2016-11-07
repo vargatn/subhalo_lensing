@@ -29,7 +29,7 @@ def _oc_nfw_intarg(phi, r, rs, rho_s, dist, fsyst=funit):
     return dst
 
 
-def oc_nfw(r, rs, rho_s, dist, fsyst, *args, **kwargs):
+def soc_nfw(r, rs, rho_s, dist, fsyst, *args, **kwargs):
     """Calculates the angle-averaged DeltaSigma at polar radius r"""
     dsum = quad(_oc_nfw_intarg, -math.pi, math.pi,
                 args=(r, rs, rho_s, dist, fsyst), points=(0.0,), epsabs=0,
@@ -55,7 +55,7 @@ def _oc_fsyst_ring(r, dist, fsyst, *args, **kwargs):
     return dsum * r
 
 
-def oc_nfw_ring(r0, r1, rs, rho_s, dist, fsyst, split=True, *args, **kwargs):
+def soc_nfw_ring(r0, r1, rs, rho_s, dist, fsyst, split=True, *args, **kwargs):
     """Calculates the ring-averaged DeltaSigma between r0 and r1"""
     if split * (r0 < dist <= r1):
         dsum0 = quad(_oc_nfw_ring, r0, dist, args=(rs, rho_s, dist, fsyst),
