@@ -10,8 +10,8 @@ import numpy as np
 from sublens.io import default_cosmo
 from ..model.astroconvert import nfw_params
 
-from ..model.cycalc import tnfw
-from ..model.cycalc import tnfw_ring
+# from ..model.cycalc import tnfw
+# from ..model.cycalc import tnfw_ring
 
 from ..model.pycalc.full_nfw import nfw_deltasigma
 from ..model.pycalc.full_nfw import nfw_ring
