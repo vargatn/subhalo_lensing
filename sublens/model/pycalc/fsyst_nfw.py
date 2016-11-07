@@ -16,8 +16,7 @@ def funit(r):
 def _oc_fsyst_intarg(phi, r, dist, fsyst=funit):
     #     print(fsyst)
     rr, term1, term2 = oc_transform(phi=phi, r=r, dist=dist)
-    dst_cen = fsyst(rr)
-    dst = dst_cen * (term1 * math.cos(2. * phi) + term2 * math.sin(2. * phi))
+    dst = fsyst(rr)
     return dst
 
 
@@ -77,3 +76,4 @@ def soc_nfw_ring(r0, r1, rs, rho_s, dist, fsyst, split=True, *args, **kwargs):
                     epsabs=0, epsrel=1e-4)[0]
     # aring = math.pi * (r1**2. - r0 **2.)
     return dsum / area
+
