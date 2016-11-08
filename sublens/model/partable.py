@@ -48,8 +48,8 @@ class TableMaker(object):
 
         :param convertor: ConvertorBase object
         """
-        if not issubclass(type(profobj), DeltaSigmaProfile):
-            raise TypeError('profobj must be a subclass of DeltaSigmaProfile')
+        # if not issubclass(type(profobj), DeltaSigmaProfile):
+        #     raise TypeError('profobj must be a subclass of DeltaSigmaProfile')
 
         self.profobj = profobj
         self.convertor = convertor
