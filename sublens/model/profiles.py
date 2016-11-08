@@ -141,7 +141,7 @@ class SimpleNFWProfile(DeltaSigmaProfile):
         return nfw_ring(r0, r1, **self.pardict)
 
 
-class SystematicNFWProfile(SimpleNFWProfile):
+class SystematicNFWProfile(DeltaSigmaProfile):
     """The conventional spherical NFW profile"""
 
     def __init__(self, cosmo=None):
