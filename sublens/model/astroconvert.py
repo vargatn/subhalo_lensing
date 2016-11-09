@@ -113,7 +113,7 @@ class DuffyCScale(ConvertorBase):
         self.requires = sorted(['m200c', 'z'])
         self.provides = sorted(['c200c'])
 
-        self.mpivot = 2. * 1e12 /0.7 # Msun / h100
+        self.mpivot = 2. * 1e12 / 0.7 # Msun / h100
         self.a200 = 6.71
         self.b200 = -0.091
         self.c200 = -0.44
@@ -138,6 +138,92 @@ class DuffyCScale(ConvertorBase):
         carr = self.a200 * (10.**marr / self.mpivot) ** self.b200 *\
                (1. + zarr) ** self.c200
         return carr[:, np.newaxis]
+
+
+class FSystSVA(object):
+    def __init__(self, mval, z):
+        self.mval = mval
+        self.z = z
+
+        self.lamb = self.m2l(10 ** self.mval, self.z)
+        print(self.lamb)
+
+    def __call__(self, rr):
+        #         print("here")
+        cval = self.deboost(rr, self.lamb, self.z)
+        #         print(cval)
+        return cval
+
+    def m2l(self, mval, z):
+        m0 = 10 ** 14.37
+        lamb0 = 30.
+        z0 = 0.5
+        # the scaling exponents
+        flamb = 1.12
+        gz = 0.18
+
+        lamb = lamb0 * ((mval / m0) / ((z / z0) ** gz)) ** (1. / flamb)
+        #         print(lamb)
+        return lamb
+
+    def deboost(self, rr, lamb, z):
+        # values from the SV paper
+        lamb0 = 30.
+        z0 = 0.5
+        rr0 = 0.5
+        b0 = 10. ** -1.399
+        clamb = 0.92
+        dz = -4.0
+        err = -0.98
+
+        bval = 1. + b0 * (lamb / lamb0) ** clamb * (z / z0) ** dz * (rr / rr0) ** err
+        return 1. / bval
+
+
+class SVSystematicScale(ConvertorBase):
+    def __init__(self):
+        """
+        Calculates NFW concentration based on M200 and redshift following
+         Duffy et al. 2008
+
+        requires:
+            m200c, z
+
+        provides:
+            c200c
+        """
+        super().__init__()
+        self.requires = sorted(['m200c', 'z'])
+        self.provides = sorted(['c200c', 'fsyst'])
+
+        self.mpivot = 2. * 1e12 / 0.7  # Msun / h100
+        self.a200 = 6.71
+        self.b200 = -0.091
+        self.c200 = -0.44
+
+    def convert(self, ftab, parnames=None, point=False):
+        """
+        Performs conversion
+
+        :param ftab: np 2D array containing the  parameters, must be sorted if
+            parnames are not specified
+
+        :param parnames: list of parameter names for each column of the input
+                ftab table
+
+        :return: np.array of c200c values
+        """
+        indices = self._get_indices(parnames)
+
+        marr = ftab[:, indices[0]]
+        zarr = ftab[:, indices[1]]
+
+        carr = self.a200 * (10. ** marr / self.mpivot) ** self.b200 * \
+               (1. + zarr) ** self.c200
+
+        fsyst = np.array([FSystSVA(m, z) for (m, z) in zip(marr, zarr)])
+        pars = np.vstack((carr, fsyst)).T
+        return pars
 
 
 class SimpleSubhaloMapper(ConvertorBase):
