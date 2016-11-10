@@ -146,7 +146,6 @@ class FSystSVA(object):
         self.z = z
 
         self.lamb = self.m2l(10 ** self.mval, self.z)
-        print(self.lamb)
 
     def __call__(self, rr):
         #         print("here")
